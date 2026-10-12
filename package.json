@@ -1,0 +1,22 @@
+{
+  "name": "fortnite-racing-association",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/serve.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.3",
+    "i18n-iso-countries": "7.14.0",
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "esbuild": "0.25.10"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
