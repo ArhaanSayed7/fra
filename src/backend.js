@@ -26,6 +26,7 @@ export const emptyDatabase = () => ({
   statistics: [],
   history: [],
   roles: [],
+  badges: [],
 });
 function check(result) {
   if (result.error) throw result.error;
@@ -37,6 +38,8 @@ async function rows(table) {
     let query = client.from(table).select("*");
     const keys = {
       event_results: ["event_id", "driver_id"],
+      event_session_results: ["session_id", "driver_id"],
+      driver_badges: ["driver_id", "badge_key"],
       event_registrations: ["event_id", "driver_id"],
       driver_statistics: ["driver_id"],
       driver_event_history: ["event_id", "driver_id"],
@@ -136,6 +139,9 @@ export async function loadRemote() {
     "driver_statistics",
     "driver_event_history",
     "track_records",
+    "event_sessions",
+    "event_session_results",
+    "driver_badges",
   ];
   const [
     creators,
@@ -148,12 +154,21 @@ export async function loadRemote() {
     statistics,
     eventHistory,
     records,
+    sessions,
+    sessionResults,
+    badges,
   ] = await Promise.all(names.map(rows));
   const roles = check(await client.rpc("driver_roles"));
   return {
     version: 1,
     roles,
-    creators,
+    badges,
+    creators: creators.sort(
+      (a, b) =>
+        a.sort_order - b.sort_order ||
+        a.name.localeCompare(b.name) ||
+        a.id.localeCompare(b.id),
+    ),
     tracks: tracks.map((t) => ({
       id: t.id,
       creator: t.creator_id,
@@ -194,13 +209,29 @@ export async function loadRemote() {
       status: v.status,
       description: v.description,
       registrationOpen: v.registration_open,
+      sessions: sessions
+        .filter((s) => s.event_id === v.id)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((s) => ({
+          id: s.id,
+          kind: s.kind,
+          name: s.name,
+          results: sessionResults
+            .filter((r) => r.session_id === s.id)
+            .map((r) => ({
+              driver: r.driver_id,
+              position: r.position,
+              time: r.race_time || "",
+              ms: r.lap_ms,
+            })),
+        })),
       results: results
         .filter((r) => r.event_id === v.id)
         .map((r) => ({
           driver: r.driver_id,
           position: r.race_position,
           time: r.race_time,
-          qualifying: formatLap(r.qualifying_ms),
+          qualifying: r.qualifying_ms ? formatLap(r.qualifying_ms) : "",
         })),
     })),
     laps: laps.map((l) => ({
@@ -213,6 +244,7 @@ export async function loadRemote() {
       tire: l.tire_compound || "",
       ms: l.lap_ms,
       proof: l.proof_url,
+      storagePath: l.proof_storage_path || "",
       status: l.status,
       reason: l.review_note,
       date: l.created_at.slice(0, 10),
@@ -244,7 +276,7 @@ export async function saveEntity(kind, o) {
   }
   if (kind === "event") {
     check(
-      await client.rpc("admin_save_event", {
+      await client.rpc("admin_save_event_details", {
         p_event: {
           id: o.id,
           track_id: o.track,
@@ -259,12 +291,6 @@ export async function saveEntity(kind, o) {
           description: o.description,
           registration_open: o.registrationOpen,
         },
-        p_results: o.results.map((r) => ({
-          driver_id: r.driver,
-          race_position: r.position,
-          race_time: r.time,
-          qualifying_ms: parseLap(r.qualifying),
-        })),
       }),
     );
     return;
@@ -272,7 +298,13 @@ export async function saveEntity(kind, o) {
   const table = kind === "creator" ? "creators" : "tracks",
     record =
       kind === "creator"
-        ? { id: o.id, name: o.name, description: o.description }
+        ? {
+            id: o.id,
+            name: o.name,
+            description: o.description,
+            avatar_url: o.avatar_url || "",
+            sort_order: o.sort_order ?? 0,
+          }
         : {
             id: o.id,
             creator_id: o.creator,
@@ -315,7 +347,8 @@ export async function submitLap(l) {
       custom_car: l.custom,
       tire_compound: l.tire || null,
       lap_ms: l.ms,
-      proof_url: l.proof,
+      proof_url: l.storagePath ? "" : l.proof,
+      proof_storage_path: l.storagePath || null,
     }),
   );
 }
@@ -376,4 +409,72 @@ export async function setDriverAdmin(driverId, enabled) {
       p_enabled: enabled,
     }),
   );
+}
+
+export async function reorderCreators(ids) {
+  check(await client.rpc("reorder_creators", { p_ids: ids }));
+}
+export async function setBadges(driverId, badges) {
+  check(
+    await client.rpc("admin_set_badges", {
+      p_driver_id: driverId,
+      p_badges: badges,
+    }),
+  );
+}
+export async function saveSessions(eventId, sessions) {
+  check(
+    await client.rpc("admin_save_sessions", {
+      p_event_id: eventId,
+      p_sessions: sessions.map((s) => ({
+        kind: s.kind,
+        name: s.name,
+        results: s.results.map((r) => ({
+          driver_id: r.driver,
+          lap_ms: s.kind === "qualifying" ? r.ms : null,
+          race_time: s.kind === "race" ? r.time : null,
+        })),
+      })),
+    }),
+  );
+}
+export async function uploadCreatorAvatar(file) {
+  const ext = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }[
+    file.type
+  ];
+  if (!ext || !file.size || file.size > 5242880)
+    throw Error("Choose a PNG, JPEG or WebP image under 5 MB.");
+  const path = identity.user.id + "/" + crypto.randomUUID() + "." + ext;
+  check(
+    await client.storage
+      .from("creator-media")
+      .upload(path, file, { contentType: file.type, upsert: false }),
+  );
+  return client.storage.from("creator-media").getPublicUrl(path).data.publicUrl;
+}
+export async function uploadLapClip(file) {
+  const ext = {
+    "video/mp4": "mp4",
+    "video/webm": "webm",
+    "video/quicktime": "mov",
+  }[file.type];
+  if (!ext || !file.size || file.size > 52428800)
+    throw Error(
+      "Choose an MP4, WebM or MOV video up to 50 MB, or use a video link.",
+    );
+  const path = identity.user.id + "/" + crypto.randomUUID() + "." + ext;
+  check(
+    await client.storage
+      .from("lap-clips")
+      .upload(path, file, { contentType: file.type, upsert: false }),
+  );
+  return path;
+}
+export async function removeUnusedClip(path) {
+  return client.storage.from("lap-clips").remove([path]);
+}
+export async function clipURL(path) {
+  return check(
+    await client.storage.from("lap-clips").createSignedUrl(path, 3600),
+  ).signedUrl;
 }

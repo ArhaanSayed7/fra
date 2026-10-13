@@ -65,6 +65,15 @@ test("FRA migration and database access rules", async (t) => {
       "utf8",
     ),
   );
+  await pg.exec(
+    await readFile(
+      new URL(
+        "../supabase/migrations/20261013024405_fra_racing_management.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   for (const id of [owner, other, incomplete, admin])
     await root(
       `insert into auth.users(id,raw_app_meta_data,raw_user_meta_data) values($1,'{"provider":"discord"}','{"avatar_url":"https://cdn.discordapp.com/avatar.png"}')`,
@@ -452,7 +461,7 @@ test("FRA migration and database access rules", async (t) => {
           JSON.stringify({ ...event, name: "Should roll back" }),
           JSON.stringify([result, { ...result, driver_id: other }]),
         ]),
-        /duplicate key/,
+        /Duplicate race positions|duplicate key/,
       );
       assert.equal(
         (await root("select name from public.events where id=$1", [eid]))
@@ -649,6 +658,362 @@ test("FRA migration and database access rules", async (t) => {
       assert.deepEqual(
         (await as("anon", null, "select * from public.driver_roles()")).rows,
         [{ driver_id: owner, role: "developer" }],
+      );
+    },
+  );
+
+  await t.test(
+    "creator order and manual display badges require admin access without granting roles",
+    async () => {
+      const c2 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab";
+      await root(
+        "insert into public.creators(id,name) values($1,'Second Creator')",
+        [c2],
+      );
+      await assert.rejects(
+        as("authenticated", other, "select public.reorder_creators($1)", [
+          [c2, cid],
+        ]),
+        /Admin access/,
+      );
+      await as("authenticated", admin, "select public.reorder_creators($1)", [
+        [c2, cid],
+      ]);
+      assert.deepEqual(
+        (
+          await root("select id from public.creators order by sort_order")
+        ).rows.map((r) => r.id),
+        [c2, cid],
+      );
+      await assert.rejects(
+        as("authenticated", admin, "select public.reorder_creators($1)", [
+          [cid, cid],
+        ]),
+        /exactly once/,
+      );
+      await assert.rejects(
+        as("authenticated", other, "select public.admin_set_badges($1,$2)", [
+          other,
+          ["map_developer"],
+        ]),
+        /Admin access/,
+      );
+      await as(
+        "authenticated",
+        admin,
+        "select public.admin_set_badges($1,$2)",
+        [other, ["map_developer", "winner"]],
+      );
+      assert.equal(
+        (
+          await as(
+            "anon",
+            null,
+            "select count(*)::int n from public.driver_badges where driver_id=$1",
+            [other],
+          )
+        ).rows[0].n,
+        2,
+      );
+      await assert.rejects(
+        as("authenticated", admin, "select public.admin_set_badges($1,$2)", [
+          other,
+          ["developer"],
+        ]),
+        /valid display badges/,
+      );
+      assert.equal(
+        (await as("authenticated", other, "select public.is_admin() ok"))
+          .rows[0].ok,
+        false,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          other,
+          "insert into public.driver_badges values($1,'record')",
+          [other],
+        ),
+        /permission denied/,
+      );
+      await as(
+        "authenticated",
+        admin,
+        "select public.admin_set_badges($1,$2)",
+        [other, []],
+      );
+      await root("delete from public.creators where id=$1", [c2]);
+    },
+  );
+  await t.test(
+    "multiple qualifying and race lobbies save atomically and retain compatible event summaries",
+    async () => {
+      const sessions = [
+        {
+          kind: "qualifying",
+          name: "Lobby A",
+          results: [
+            { driver_id: owner, lap_ms: 61000 },
+            { driver_id: other, lap_ms: 60000 },
+          ],
+        },
+        {
+          kind: "qualifying",
+          name: "Lobby B",
+          results: [{ driver_id: owner, lap_ms: 59000 }],
+        },
+        {
+          kind: "race",
+          name: "Race A",
+          results: [
+            { driver_id: other, race_time: "12:00.000" },
+            { driver_id: owner, race_time: "+2.000" },
+          ],
+        },
+        {
+          kind: "race",
+          name: "Race B",
+          results: [{ driver_id: owner, race_time: "11:58.000" }],
+        },
+      ];
+      await assert.rejects(
+        as("authenticated", other, "select public.admin_save_sessions($1,$2)", [
+          eid,
+          JSON.stringify(sessions),
+        ]),
+        /Admin access/,
+      );
+      await as(
+        "authenticated",
+        admin,
+        "select public.admin_save_sessions($1,$2)",
+        [eid, JSON.stringify(sessions)],
+      );
+      assert.equal(
+        (
+          await root(
+            "select count(*)::int n from public.event_sessions where event_id=$1",
+            [eid],
+          )
+        ).rows[0].n,
+        4,
+      );
+      const summary = (
+        await root(
+          "select race_position,qualifying_ms from public.event_results where event_id=$1 and driver_id=$2",
+          [eid, owner],
+        )
+      ).rows[0];
+      assert.deepEqual(summary, { race_position: 1, qualifying_ms: 59000 });
+      assert.equal(
+        (
+          await root(
+            "select count(*)::int n from public.event_results where event_id=$1 and race_position=1",
+            [eid],
+          )
+        ).rows[0].n,
+        2,
+      );
+      const broken = structuredClone(sessions);
+      broken[0].results.push(broken[0].results[0]);
+      await assert.rejects(
+        as("authenticated", admin, "select public.admin_save_sessions($1,$2)", [
+          eid,
+          JSON.stringify(broken),
+        ]),
+        /duplicate key/,
+      );
+      assert.equal(
+        (
+          await root(
+            "select count(*)::int n from public.event_sessions where event_id=$1",
+            [eid],
+          )
+        ).rows[0].n,
+        4,
+      );
+      await as(
+        "authenticated",
+        admin,
+        "select public.admin_save_sessions($1,$2)",
+        [
+          eid,
+          JSON.stringify([
+            {
+              kind: "qualifying",
+              name: "Qualifying only",
+              results: [{ driver_id: owner, lap_ms: 58000 }],
+            },
+          ]),
+        ],
+      );
+      assert.equal(
+        (
+          await root(
+            "select race_position from public.event_results where event_id=$1",
+            [eid],
+          )
+        ).rows[0].race_position,
+        null,
+      );
+      const event = {
+        id: eid,
+        track_id: tid,
+        name: "Keep sessions",
+        event_date: "2026-10-01",
+        qualifying_time: "18:30",
+        race_time: "19:00",
+        laps: 24,
+        round: "01",
+        status: "past",
+      };
+      await as(
+        "authenticated",
+        admin,
+        "select public.admin_save_event_details($1)",
+        [JSON.stringify(event)],
+      );
+      assert.equal(
+        (
+          await root(
+            "select count(*)::int n from public.event_sessions where event_id=$1",
+            [eid],
+          )
+        ).rows[0].n,
+        1,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          other,
+          "insert into public.event_sessions(event_id,kind,name,sort_order) values($1,'race','Forged',9)",
+          [eid],
+        ),
+        /permission denied/,
+      );
+    },
+  );
+  await t.test(
+    "uploaded proof is owned, private while pending and readable only after approval",
+    async () => {
+      const path = owner + "/99999999-9999-4999-8999-999999999999.mp4";
+      await root("update public.drivers set is_active=true where id=$1", [
+        owner,
+      ]);
+      await as(
+        "authenticated",
+        owner,
+        "insert into storage.objects(bucket_id,name) values('lap-clips',$1)",
+        [path],
+      );
+      assert.equal(
+        (
+          await as(
+            "anon",
+            null,
+            "select * from storage.objects where name=$1",
+            [path],
+          )
+        ).rows.length,
+        0,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          other,
+          "insert into storage.objects(bucket_id,name) values('lap-clips',$1)",
+          [owner + "/bad.mp4"],
+        ),
+        /row-level security/,
+      );
+      const inserted = await as(
+        "authenticated",
+        owner,
+        `insert into public.laps(driver_id,track_id,weather,car_class,custom_car,tire_compound,lap_ms,proof_url,proof_storage_path) values($1,$2,'Dry','Prevalents','','Soft',100001,'',$3) returning id`,
+        [owner, tid, path],
+      );
+      assert.equal(
+        (
+          await as(
+            "authenticated",
+            owner,
+            "delete from storage.objects where name=$1 returning id",
+            [path],
+          )
+        ).rows.length,
+        0,
+      );
+      assert.equal(
+        (
+          await as(
+            "authenticated",
+            other,
+            "select * from storage.objects where name=$1",
+            [path],
+          )
+        ).rows.length,
+        0,
+      );
+      assert.equal(
+        (
+          await as(
+            "authenticated",
+            admin,
+            "select * from storage.objects where name=$1",
+            [path],
+          )
+        ).rows.length,
+        1,
+      );
+      await as(
+        "authenticated",
+        admin,
+        "select public.review_lap($1,'approved','')",
+        [inserted.rows[0].id],
+      );
+      assert.equal(
+        (
+          await as(
+            "anon",
+            null,
+            "select * from storage.objects where name=$1",
+            [path],
+          )
+        ).rows.length,
+        1,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          owner,
+          `insert into public.laps(driver_id,track_id,weather,car_class,custom_car,tire_compound,lap_ms,proof_url) values($1,$2,'Dry','Prevalents','','Soft',100002,'')`,
+          [owner, tid],
+        ),
+        /check constraint/,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          owner,
+          `insert into public.laps(driver_id,track_id,weather,car_class,custom_car,tire_compound,lap_ms,proof_url,proof_storage_path) values($1,$2,'Dry','Prevalents','','Soft',100002,'',$3)`,
+          [owner, tid, owner + "/88888888-8888-4888-8888-888888888888.mp4"],
+        ),
+        /Upload your video/,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          other,
+          "insert into storage.objects(bucket_id,name) values('creator-media',$1)",
+          [other + "/avatar.png"],
+        ),
+        /row-level security/,
+      );
+      await as(
+        "authenticated",
+        admin,
+        "insert into storage.objects(bucket_id,name) values('creator-media',$1)",
+        [admin + "/avatar.png"],
       );
     },
   );

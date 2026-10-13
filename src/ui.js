@@ -218,7 +218,15 @@ function enhanceSuggestions(input) {
   input.setAttribute("aria-controls", menu.id);
   let choices = [],
     active = -1;
+  const floating =
+    input.hasAttribute("data-driver-picker") &&
+    typeof menu.showPopover === "function";
+  if (floating) {
+    menu.setAttribute("popover", "manual");
+    menu.classList.add("driver-suggestions");
+  }
   const close = () => {
+    if (floating && menu.matches(":popover-open")) menu.hidePopover();
     menu.hidden = true;
     input.setAttribute("aria-expanded", "false");
     input.removeAttribute("aria-activedescendant");
@@ -274,10 +282,27 @@ function enhanceSuggestions(input) {
       empty.textContent =
         input.id === "country-input"
           ? "No countries found."
-          : "Type your car name.";
+          : input.hasAttribute("data-driver-picker")
+            ? "Choose a registered driver."
+            : "Type your car name.";
       menu.append(empty);
     }
     menu.hidden = false;
+    if (floating) {
+      const r = input.getBoundingClientRect();
+      const width = Math.min(r.width, innerWidth - 24),
+        below = innerHeight - r.bottom;
+      menu.style.left =
+        Math.max(12, Math.min(r.left, innerWidth - width - 12)) + "px";
+      menu.style.top =
+        (below < 150
+          ? Math.max(12, r.top - Math.min(240, r.top - 12) - 5)
+          : r.bottom + 5) + "px";
+      menu.style.width = width + "px";
+      menu.style.maxHeight =
+        Math.max(120, Math.min(240, innerHeight - r.bottom - 20)) + "px";
+      menu.showPopover();
+    }
     input.setAttribute("aria-expanded", "true");
     openMenu = { close, shell };
   };
@@ -325,7 +350,7 @@ document.addEventListener("pointerdown", (e) => {
 });
 window.addEventListener("hashchange", closeMenu);
 document.addEventListener("close", closeMenu, true);
-// A local liquid highlight, clipped to the title. No page-wide cursor follower.
+// Thin, short-lived sparks follow movement across the headline.
 export function titleMotion(title) {
   if (
     !title ||
@@ -333,42 +358,133 @@ export function titleMotion(title) {
     !matchMedia("(pointer: fine)").matches
   )
     return () => {};
-  let frame,
-    x = 0,
-    y = 0,
-    tx = 0,
-    ty = 0,
-    active = false;
-  const draw = () => {
-    x += (tx - x) * 0.18;
-    y += (ty - y) * 0.18;
-    title.style.setProperty("--ink-x", x + "px");
-    title.style.setProperty("--ink-y", y + "px");
-    if (active || Math.abs(tx - x) + Math.abs(ty - y) > 0.2)
-      frame = requestAnimationFrame(draw);
+  const canvas = document.createElement("canvas");
+  canvas.className = "title-sparks";
+  canvas.setAttribute("aria-hidden", "true");
+  title.append(canvas);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return () => canvas.remove();
+  let particles = [],
+    frame = 0,
+    last = null,
+    previous = 0;
+  const resize = () => {
+    const r = title.getBoundingClientRect(),
+      dpr = Math.min(devicePixelRatio, 2);
+    canvas.width = r.width * dpr;
+    canvas.height = r.height * dpr;
+    canvas.style.width = r.width + "px";
+    canvas.style.height = r.height + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  resize();
+  const observer = new ResizeObserver(resize);
+  observer.observe(title);
+  const draw = (now) => {
+    const dt = Math.min(0.035, (now - previous) / 1000 || 0.016);
+    previous = now;
+    const r = title.getBoundingClientRect();
+    ctx.clearRect(0, 0, r.width, r.height);
+    particles = particles.filter((p) => p.life > 0);
+    for (const p of particles) {
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 120 * dt;
+      ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.strokeStyle = p.hot ? "#fff7cb" : "#ffba35";
+      ctx.lineWidth = p.hot ? 1.3 : 0.7;
+      ctx.shadowColor = "#ffb029";
+      ctx.shadowBlur = p.hot ? 5 : 2;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * 0.022, p.y - p.vy * 0.022);
+      ctx.stroke();
+    }
+    if (particles.length) frame = requestAnimationFrame(draw);
     else frame = 0;
   };
-  const move = (e) => {
-    const r = title.getBoundingClientRect();
-    tx = e.clientX - r.left;
-    ty = e.clientY - r.top;
-    if (!active) {
-      x = tx;
-      y = ty;
-    }
-    active = true;
+  const move = (event) => {
+    if (document.body.classList.contains("motion-off")) return;
+    const r = title.getBoundingClientRect(),
+      x = event.clientX - r.left,
+      y = event.clientY - r.top;
+    title.style.setProperty("--ink-x", x + "px");
+    title.style.setProperty("--ink-y", y + "px");
     title.classList.add("ink-active");
-    if (!frame) frame = requestAnimationFrame(draw);
+    const dx = last ? x - last.x : 8,
+      dy = last ? y - last.y : 0,
+      distance = Math.hypot(dx, dy);
+    if (distance > 2) {
+      const count = Math.min(12, Math.ceil(distance / 4));
+      for (let i = 0; i < count; i++) {
+        const life = 0.18 + Math.random() * 0.32;
+        particles.push({
+          x: x - (dx * i) / count,
+          y: y - (dy * i) / count,
+          vx: -dx * 3 + (Math.random() - 0.5) * 100,
+          vy: dy * 0.6 + (Math.random() - 0.5) * 65,
+          life,
+          max: life,
+          hot: i % 3 === 0,
+        });
+      }
+      particles = particles.slice(-100);
+      if (!frame) {
+        previous = performance.now();
+        frame = requestAnimationFrame(draw);
+      }
+    }
+    last = { x, y };
   };
   const leave = () => {
-    active = false;
+    last = null;
     title.classList.remove("ink-active");
   };
   title.addEventListener("pointermove", move);
   title.addEventListener("pointerleave", leave);
   return () => {
     cancelAnimationFrame(frame);
+    observer.disconnect();
     title.removeEventListener("pointermove", move);
     title.removeEventListener("pointerleave", leave);
+    canvas.remove();
   };
 }
+let lastPage;
+export function pageTransition(root, page, force = false) {
+  if (
+    (lastPage !== page || force) &&
+    !matchMedia("(prefers-reduced-motion: reduce)").matches
+  )
+    root.animate(
+      [
+        { opacity: 0.15, transform: "translateY(14px)", filter: "blur(3px)" },
+        { opacity: 1, transform: "translateY(0)", filter: "blur(0)" },
+      ],
+      { duration: 380, easing: "cubic-bezier(.2,.7,.2,1)" },
+    );
+  lastPage = page;
+}
+const bootStarted = performance.now();
+let bootFinishing = false;
+export async function finishBoot(ready = true) {
+  const screen = document.getElementById("boot-screen");
+  if (!screen || bootFinishing) return;
+  bootFinishing = true;
+  const status = screen.querySelector(".boot-status");
+  if (status)
+    status.textContent = ready ? "GRID READY" : "CONNECTING TO THE PADDOCK";
+  if (ready) screen.classList.add("boot-ready");
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.max(0, 950 - (performance.now() - bootStarted))),
+    );
+  screen.classList.add("boot-exit");
+  document.body.classList.remove("booting");
+  document
+    .querySelectorAll("#header,#app,#footer")
+    .forEach((el) => (el.inert = false));
+  setTimeout(() => screen.remove(), 450);
+}
+setTimeout(() => finishBoot(false), 7000);

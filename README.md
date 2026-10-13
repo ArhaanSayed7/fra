@@ -6,13 +6,13 @@ Modern black-and-yellow FRA racing hub, ready for GitHub and Cloudflare Pages, w
 
 ## Included
 
-- Floating interactive 3D Prevalent, cursor-local liquid headline highlights, gradient buttons, true black backgrounds and locally hosted Manrope fonts. Motion respects reduced-motion preferences and the pause control.
-- Upcoming events, completed event archive, qualifying/race toggles and event entries.
-- Compact track cards grouped by creator, with small image headers, map codes, release dates, setup summaries and approved lap-record times. Full descriptions and record details are on each track’s detail page.
+- Floating interactive 3D Prevalent, thin F1-style headline sparks, an ignition loading screen and page/profile transitions, gradient buttons, true black backgrounds and locally hosted Manrope fonts. Motion respects reduced-motion preferences and the pause control.
+- Upcoming events, completed event archive, qualifying/race toggles and event entries. Named qualifying lobbies and race sessions use compact table entry, with independent poles and race finishing orders.
+- Creator avatars and admin-controlled listing order. Compact track cards grouped by creator, with small image headers, map codes, release dates, setup summaries and approved lap-record times. Full descriptions and record details are on each track’s detail page.
 - Track-specific weather, car classes and optional tires: Ultrasoft, Soft, Medium, Hard, Ultrahard, Intermediate and Wet.
-- Time-trial leaderboard with track-specific filter choices. Unsupported tires and fixed single-choice weather/car filters are hidden; incompatible selections reset when switching tracks. Mandatory HTTPS video-proof links.
+- Time-trial leaderboard with track-specific filter choices. Unsupported tires and fixed single-choice weather/car filters are hidden; incompatible selections reset when switching tracks. Mandatory video proof using an HTTPS link or a private MP4/WebM/MOV device upload up to 50 MB.
 - Email/password or Discord registration and login, editable driver profiles, avatar and optional banner uploads, searchable country selector. Email signup signs in immediately when Supabase's Confirm email setting is off.
-- Compact driver list rows and profile popups with shorter landscape banners, events entered/won/podiums, lap records and scrollable event history. Developer/Admin role badges and earned Event Winner, Event Pole and Lap Record badges.
+- Compact driver list rows and profile popups with shorter landscape banners, events entered/won/podiums, lap records and scrollable event history. Developer/Admin role badges and earned Event Winner, Event Pole and Lap Record badges. Admins can award Map Developer and additional display badges.
 - Admin Panel with database-controlled access, driver editing/deactivation, creator/track/event management, results and lap moderation. Only the protected Developer can grant/revoke other registered drivers’ admin access from its Access tab.
 
 ## Local development
@@ -39,7 +39,9 @@ For an isolated design preview, leave the Supabase variables blank and set `PUBL
 - `src/leaderboard-filters.js`: catalogue-scoped filter choices and selection normalization.
 - `src/driver-badges.js`: role lookup and result-based achievement rules.
 - `src/countries.js`: searchable country names and codes, sourced from i18n-iso-countries.
-- `src/car.js`: Three.js car animation.
+- `src/car.js`: Three.js car animation and hover lighting.
+- `src/car-details.js`: model-specific rubber, forged wheels and lamp surfaces.
+- `src/event-sessions.js`: named-session compatibility and result-entry validation.
 - `src/data.js`: lap formatting, escaping and optional demo data.
 - `dist/`: static HTML, CSS, local assets and generated bundles. Keep its HTML/CSS/assets in Git; the build updates `app.js` and `config.js`.
 - `scripts/`: build and local preview server.
@@ -56,9 +58,9 @@ Drivers own their profile edits, media uploads, event entries and lap submission
 
 A lap record is the fastest approved lap on a track across all setups. Equal times use submission time and ID as a stable tie-break. Time-trial rankings compare track, weather, car class, custom car name and tire compound. Each driver contributes their best approved time for each setup.
 
-Events entered counts current event registrations, including historical result entries. Wins and podiums count only events marked completed. Event Winner badges require a completed race win; Event Pole badges require the fastest valid qualifying time in a completed event, with a stable driver-ID tie break. Lap Record badges require a current approved overall track record. Losing a record removes that badge unless the driver still holds another record. The admin event save function writes event details and classification together; invalid results roll back the entire save. Historical results automatically create matching event entries. Cancelling an upcoming entry removes it from the driver's entered count and history.
+Events entered counts current event registrations, including historical result entries. Wins and podiums count only events marked completed. Event Winner badges require a completed race win; Event Pole badges require the fastest valid qualifying time in each lobby of a completed event, with a stable driver-ID tie break. Lap Record badges require a current approved overall track record. Losing a record removes that badge unless the driver still holds another record. Event details and result sessions are saved separately. Every result-session save is atomic, including the compatible per-event summary; invalid results roll back the entire save. Each qualifying lobby has its own pole, and race sessions preserve entered finishing order. Historical results automatically create matching event entries. Cancelling an upcoming entry removes it from the driver's entered count and history.
 
-Video proof uses a link to an external video host, rather than uploading video files to Supabase. Custom car names are free-text suggestions collected from existing laps until an official list is supplied. Event sessions use America/Toronto. The site loads shared data on page load and after writes; reload to see changes made by another user.
+Video proof accepts external HTTPS links or device uploads to the private lap-clips bucket (50 MB maximum). Owners/admins can view pending proof, and approved proof can be opened publicly through signed URLs. Creator avatars use a separate public image bucket with admin-only uploads. Custom car names are free-text suggestions collected from existing laps until an official list is supplied. Event sessions use America/Toronto. The site loads shared data on page load and after writes; reload to see changes made by another user.
 
 ## Checks and deployment limits
 
@@ -67,7 +69,7 @@ npm test
 npm run build
 ```
 
-Database tests exercise all four migrations, email profile creation/backfill, profile permissions, catalogue permissions, lap ownership/setup validation/moderation, event entries, transactional results/statistics and media ownership, protected developer/admin management, and earned badge rules. Auth tests use the installed Supabase SDK with simulated responses to check immediate signup, password login, errors, password updates and the confirmation-enabled fallback. These tests do not create production accounts. The included build is connected to the owner’s FRA project using its public publishable key. Set the documented Cloudflare environment variables when rebuilding.
+Database tests exercise all five migrations, email profile creation/backfill, profile permissions, catalogue permissions, lap ownership/setup validation/moderation, event entries, transactional results/statistics and media ownership, protected developer/admin management, and earned badge rules. Auth tests use the installed Supabase SDK with simulated responses to check immediate signup, password login, errors, password updates and the confirmation-enabled fallback. These tests do not create production accounts. The included build is connected to the owner’s FRA project using its public publishable key. Set the documented Cloudflare environment variables when rebuilding.
 
 The site is a static Cloudflare Pages deployment. Supabase handles identity, database access and uploads directly; no Cloudflare functions or private API key are required. Configure database backups and usage limits for your own project as it grows.
 

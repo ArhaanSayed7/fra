@@ -1,57 +1,54 @@
-# FRA modern redesign update
+# FRA racing tools and motion update
 
-The existing website is https://fra-hub.pages.dev/. Email/password and Discord registration already work. All four database migrations have been applied to the FRA project, and Rivers has protected Developer ownership. No database queries, new environment variables or Discord changes are needed for this update.
+This update includes the complete modern redesign plus creator ordering/avatars, Map Developer and manual badges, named qualifying/race sessions, device clip uploads, page/profile transitions, the ignition loading screen, F1-style headline sparks and the improved Prevalent wheels/lights.
 
-## Upload the update
+## Upload to your existing repository
 
-1. Extract **fra-modern-redesign-update.zip**.
-2. Open the extracted folder in Finder. Select the files and folders **inside it**, then drag them together onto GitHub’s **Add file → Upload files** page in **ArhaanSayed7/fra**. Preserve the nested `src`, `dist`, `licenses`, `supabase` and `tests` folders; do not flatten them or upload the ZIP itself.
-3. Commit the replacements to **main**. Cloudflare Pages automatically builds and deploys the commit.
-4. Wait for a successful deployment, then refresh the FRA website. If the old appearance remains, refresh without cache (**⌘⇧R** in Chrome).
+1. Extract **fra-racing-features-update.zip**.
+2. Drag the files and folders inside the extracted folder together onto **ArhaanSayed7/fra → Add file → Upload files**. Preserve the nested folders and replace matching files. Do not upload the ZIP itself or put everything inside an extra outer folder.
+3. Commit to **main**. Wait for Cloudflare Pages to finish its automatic deployment, then refresh the website without cache if needed.
 
-The update ZIP has files at its root. `package.json` already in your repository stays at the root. The full website ZIP is also available for a complete fresh copy; upload the contents of its inner `fortnite-racing-association` folder.
+All five database migrations, including the new racing tools, are already applied to your existing FRA Supabase project. The creator-avatar and private lap-clip storage buckets are ready. **Do not run SQL again.** No new environment variables, email settings or Discord configuration are needed. The frontend must still be uploaded to make these controls available on the live site.
 
-## New look and navigation
+## Track developer order and avatars
 
-True black pages, locally hosted Manrope fonts, yellow-to-orange gradients, rounded panels, cleaner tables and dropdowns, button hover highlights, and a cursor-local liquid highlight on **FIND YOUR LIMIT**. The Prevalent model remains interactive. Reduced-motion preferences and the motion pause control are respected.
+Open **Admin Panel → Creators**. Use the up/down arrows to save the public listing order. This same order appears in the track directory and creator pickers. Edit a creator to set an HTTPS avatar image URL or choose a PNG, JPEG or WebP from your device (up to 5 MB). A chosen upload replaces the URL. Leave both blank for the creator’s initials.
 
-**REGISTER NOW** opens account creation for unregistered visitors. Registered drivers see **MY PROFILE**, which opens their editable account. **Submit Lap** sits immediately to its left. **Admin Panel** replaces Race control, with its link in the header or mobile menu for authorized users.
+## Give drivers badges
 
-The driver directory uses compact list rows with avatars, badges and statistics. Profile popups have a shorter, wider banner with a rounded outer frame; the image uses a landscape crop on desktop and adapts on mobile. The track directory shows compact cards with small image headers, map codes, release dates, supported setups and lap-record times. Full information is available under View track. Your existing pictures, banner, country, profile information and racing data are preserved.
+Open **Admin Panel → Drivers → Badges**, or open a driver’s profile and choose **Edit badges**. Developers and Admins can award **Map Developer**, **Event Winner**, **Event Pole** and **Lap Record** display badges.
 
-## Give another driver admin access
+Race results and approved records also award the achievement badges automatically. Removing a manual award keeps any badge still earned through results. Manual awards affect badges; driver statistics still come from event results and actual records.
 
-1. Sign in as **Rivers** and refresh the page after deployment.
-2. Open **Admin Panel → Access**.
-3. Find an active registered driver and click **MAKE ADMIN**. Their profile gains the Admin badge. Use **REMOVE ADMIN** to revoke access.
+**Developer** and **Admin** badges reflect website permissions. Only Rivers’ protected Developer account can appoint/remove admins through **Access**. An ordinary admin cannot grant themselves Developer ownership or promote another admin by awarding a badge.
 
-Only Rivers’ protected Developer role can use these controls. Admins can manage racing content and driver profiles but cannot appoint admins or assign Developer ownership. Inactive drivers must be activated in the **Drivers** tab first. Discord server roles and website admin roles are separate.
+## Enter event results
 
-## Badges
+1. Create or edit the event’s details as before.
+2. Under **Admin Panel → Events**, click **Results** beside the event. You can also open **Enter results** on the event page.
+3. Each named qualifying lobby has a long table. Type a registered driver’s name and their lap in **M:SS.mmm** format. Add more qualifying lobbies as needed. Drivers can appear once per lobby, and can take part in several different lobbies.
+4. Race tables use row order as finishing order. Enter the total race time, gap, DNF or DNS. Use the arrows to move finishers up/down. Add separate race sessions if needed.
+5. Blank rows are ignored. Add five more rows at a time. **Save all results** saves every session together; an invalid row leaves the existing results intact.
+6. Mark the event **Completed** in its details to award result-based badges. Each qualifying lobby awards its fastest valid driver an Event Pole badge; equal lap times use a stable driver-ID tie break. A race-session win awards Event Winner. Profile win/podium counts count distinct events, so winning two sessions in one event still counts as one event won.
 
-- **Developer**: Rivers’ protected website ownership.
-- **Admin**: registered drivers granted website admin access.
-- **Event Winner**: at least one race win in a completed event.
-- **Event Pole**: fastest valid qualifying lap in a completed event; equal times use a stable driver-ID tie break.
-- **Lap Record**: currently holds at least one approved overall track record. Pending laps do not count. Losing every record removes the badge.
+Public event pages show each named session under the Qualifying/Race toggle. Existing single-session results are preserved. Event details can now be edited without erasing session results. Profiles, event history and Discord driver embeds retain their existing summary format.
 
-These achievement badges come from actual event results and approved laps. Admins maintain those results and approve lap proof as before.
+## Submit a device video
 
-## Existing hosting settings
+On **Submit Lap**, choose **Upload clip** and select an **MP4, WebM or MOV up to 50 MB** from your computer/gallery. Complete the setup and lap time, confirm the lap is complete, and submit for review. Use **Video link** for larger files.
 
-Build command **npm run build**, output **dist**, root directory blank. Keep the existing Production build variables:
+The upload stays private while pending/rejected: its driver and website admins can view it. After approval, viewers can open its proof from the leaderboard using an expiring signed link. Moderators see a video player in the review dialog. An Open clip link is available if the browser cannot play a particular MOV codec. A failed lap save attempts to remove its unused uploaded clip. Submitted proof cannot be deleted by the driver through the storage API.
 
-```text
-NODE_VERSION=22
-PUBLIC_SUPABASE_URL=https://jvarfwhhfpytpskghuky.supabase.co
-PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_nJYrdAem-_vTeHQ5BuQtcQ_x_cWQsQV
-PUBLIC_DEMO_MODE=false
-```
+## Motion and car
 
-The database migration in the ZIP is a reference for fresh installations. It is already applied to your FRA project; do not run it again. Your working login and redirect settings stay the same.
+The ignition screen has a perspective grid, a gold start-light sequence and a short reveal. Profiles rise/fade into view, and navigation uses a subtle page transition. The headline uses thin sparks following your movement instead of the earlier broad liquid highlight.
 
-## Verification
+The supplied Prevalent retains its holographic body, sits slightly lower, and now has matte rubber tires, metallic spoked wheels, red sidewall accents and aligned head/tail lights. Hovering the actual car activates the headlights and gives two brief high-beam lifts, then steady dipped lights. Keyboard focus also activates lighting. Pause motion stops the hero animation and spark trail and keeps lighting steady. Reduced-motion settings also disable page/profile transitions.
 
-All 19 automated checks pass, including driver permissions, developer-only admin grants/revocation, protected ownership, achievement rules, email authentication, event results, lap moderation and media ownership. The production build succeeds. Desktop and 390px mobile previews were inspected, including profile/history dialogs, compact driver lists and track cards, country search, keyboard dropdown selection, event session toggles and admin controls. Leaderboard filters use only the selected track’s available weather, cars and tires; fixed single choices and unavailable tire controls are hidden. Switching tracks clears incompatible old selections. Automated tests cover these transitions. Admin grant/revoke browser checks used an isolated local fixture, without changing real drivers’ permissions. Rivers’ live Developer role was verified separately.
+## Hosting and validation
 
-After uploading, confirm the new appearance, your Developer badge and the Access tab on the live site. No real event results or lap submissions were added during testing.
+Keep build **npm run build**, output **dist**, root blank and the existing public Supabase settings. Upload **dist/_headers** as well: it permits uploaded video playback while preserving the car’s blob texture support.
+
+All **24 automated checks pass**, covering the original permissions/auth/leaderboard rules plus session validation and atomic saves, multiple lobbies, creator ordering, manual badge permissions and private uploaded proof. The production build succeeds. Desktop and mobile previews were checked with isolated sample data. A synthetic local clip was submitted and opened in the review player without creating a real submission or uploading test media to production. The Supabase security advisor has no new warnings from this update.
+
+Fresh installations on a different Supabase project should follow **SETUP.md** and run all five migrations in order. The existing FRA project is already updated.

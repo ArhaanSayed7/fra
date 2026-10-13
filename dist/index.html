@@ -14,10 +14,35 @@
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="modern.css" />
   </head>
-  <body>
-    <header id="header"></header>
-    <main id="app"></main>
-    <footer id="footer"></footer>
+  <body class="booting">
+    <div
+      id="boot-screen"
+      class="boot-screen"
+      role="status"
+      aria-live="polite"
+      aria-label="Loading Fortnite Racing Association"
+    >
+      <div class="boot-grid"></div>
+      <div class="boot-halo"></div>
+      <div class="boot-content">
+        <span class="boot-eyebrow">FORTNITE RACING ASSOCIATION</span
+        ><img src="assets/fra-logo.png" alt="FRA" width="110" height="110" />
+        <div class="boot-title">
+          LIGHTS OUT<span>START YOUR NEXT CHAPTER.</span>
+        </div>
+        <div class="boot-lights" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="boot-progress"><span></span></div>
+        <span class="boot-status">PREPARING THE GRID</span>
+      </div>
+      <div class="boot-footer">
+        FRA / RACING TOGETHER<span>EST. COMMUNITY</span>
+      </div>
+    </div>
+    <header id="header" inert></header>
+    <main id="app" inert></main>
+    <footer id="footer" inert></footer>
     <dialog id="modal"></dialog>
     <div id="toast" role="status" aria-live="polite"></div>
     <script src="config.js"></script>

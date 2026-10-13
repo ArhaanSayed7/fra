@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { enhanceCarDetails } from "./car-details.js";
 export function carScene(el) {
   let renderer,
     disposed = false,
@@ -8,9 +9,11 @@ export function carScene(el) {
     model,
     drag = false,
     lastX = 0,
-    userRotation = 0;
+    userRotation = 0,
+    details,
+    hovered = false;
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let paused = reduce;
+  let paused = reduce || document.body.classList.contains("motion-off");
   const pointer = { x: 0, y: 0 };
   try {
     renderer = new THREE.WebGLRenderer({
@@ -86,6 +89,7 @@ export function carScene(el) {
             }
           }
         });
+        details = enhanceCarDetails(THREE, model);
         pivot.add(model);
         el.querySelector(".load-state")?.remove();
       },
@@ -109,10 +113,30 @@ export function carScene(el) {
       (e) => (visible = e[0].isIntersecting),
     );
     intersection.observe(el);
+    el.tabIndex = 0;
+    const focus = () => {
+      hovered = true;
+      el.dataset.lights = "on";
+    };
+    const blur = () => {
+      hovered = false;
+      el.dataset.lights = "off";
+    };
+    el.addEventListener("focus", focus);
+    el.addEventListener("blur", blur);
+    const raycaster = new THREE.Raycaster();
     const move = (e) => {
       let r = el.getBoundingClientRect();
       pointer.x = (e.clientX - r.left) / r.width - 0.5;
       pointer.y = (e.clientY - r.top) / r.height - 0.5;
+      if (model) {
+        raycaster.setFromCamera(
+          new THREE.Vector2(pointer.x * 2, -pointer.y * 2),
+          camera,
+        );
+        hovered = raycaster.intersectObject(model, true).length > 0;
+        el.dataset.lights = hovered ? "on" : "off";
+      }
       if (drag) {
         userRotation += (e.clientX - lastX) * 0.008;
         lastX = e.clientX;
@@ -124,6 +148,12 @@ export function carScene(el) {
     };
     const up = () => (drag = false);
     el.addEventListener("pointermove", move);
+    const leave = () => {
+      hovered = false;
+      el.dataset.lights = "off";
+      pointer.x = pointer.y = 0;
+    };
+    el.addEventListener("pointerleave", leave);
     el.addEventListener("pointerdown", down);
     window.addEventListener("pointerup", up);
     let start = performance.now();
@@ -143,13 +173,16 @@ export function carScene(el) {
               Math.min(scrollY / 2000, 0.4));
         pivot.rotation.z = -0.07 + motion * Math.sin(t * 0.5) * 0.025;
         pivot.rotation.x = motion * pointer.y * 0.08;
-        pivot.position.y = motion * Math.sin(t * 0.9) * 0.08;
+        pivot.position.y = -0.18 + motion * Math.sin(t * 0.9) * 0.08;
+        details?.update(t, hovered, reduce || paused);
       }
       renderer.render(scene, camera);
     }
     frame = requestAnimationFrame(animate);
     const btn = document.getElementById("motion");
     if (btn) {
+      document.body.classList.toggle("motion-off", paused);
+      btn.setAttribute("aria-pressed", String(paused));
       btn.textContent = paused ? "▶ Motion off" : "Ⅱ Pause motion";
       btn.onclick = () => {
         paused = !paused;
@@ -164,6 +197,11 @@ export function carScene(el) {
       observer.disconnect();
       intersection.disconnect();
       window.removeEventListener("pointerup", up);
+      el.removeEventListener("focus", focus);
+      el.removeEventListener("blur", blur);
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerdown", down);
+      el.removeEventListener("pointerleave", leave);
       scene.traverse((o) => {
         o.geometry?.dispose();
         for (const m of (Array.isArray(o.material)
@@ -172,6 +210,7 @@ export function carScene(el) {
         ).filter(Boolean))
           m.dispose();
       });
+      details?.dispose();
       env.dispose();
       renderer.dispose();
     };

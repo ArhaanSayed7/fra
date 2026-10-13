@@ -14,6 +14,8 @@ import * as backend from "./backend.js";
 import { carScene } from "./car.js";
 import { enhanceControls, titleMotion } from "./ui.js";
 import { leaderboardSetup } from "./leaderboard-filters.js";
+import { sessionsForEvent, normalizeSessions } from "./event-sessions.js";
+import { finishBoot, pageTransition } from "./ui.js";
 import { achievements, roleFor } from "./driver-badges.js";
 const demo = backend.demo,
   live = !!backend.client;
@@ -99,6 +101,14 @@ function showModal(title, body, className = "") {
   modal.innerHTML = `<div class="modal-head"><h3 id="dialog-title">${e(title)}</h3><button class="close" data-action="close" aria-label="Close dialog">×</button></div>${body}`;
   modal.scrollTop = 0;
   modal.showModal();
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
+    modal.animate(
+      [
+        { opacity: 0, transform: "translateY(22px) scale(.98)" },
+        { opacity: 1, transform: "translateY(0) scale(1)" },
+      ],
+      { duration: 330, easing: "cubic-bezier(.2,.8,.2,1)" },
+    );
   enhanceControls(modal);
 }
 function closeModal() {
@@ -180,7 +190,7 @@ function eventPage(id) {
         parseLap(a.qualifying) - parseLap(b.qualifying) ||
         a.driver.localeCompare(b.driver),
     );
-  return `<section class="page">${pageHeading("ROUND " + e(ev.round), e(ev.name), e(ev.description), '<a class="text-button" href="#events">← BACK TO EVENTS</a>')}${notice()}<div class="event-detail"><img src="${image(t)}" alt="${e(t?.name)} concept circuit"><div><span class="tag">${ev.status === "past" ? "COMPLETED" : "UPCOMING"}</span><h3 style="margin-top:25px"><a href="#track/${e(t?.id)}">${e(t?.name)} ↗</a></h3><div class="session-toggle">${["qualifying", "race"].map((s) => `<button data-action="session" data-id="${e(id)}" data-mode="${s}" class="${mode === s ? "selected" : ""}" aria-pressed="${mode === s}">${s === "race" ? "Race" : "Qualifying"}</button>`).join("")}</div><div class="detail-list"><div><span>DATE</span><strong>${date(ev.date)}</strong></div><div><span>${mode === "race" ? "LIGHTS OUT" : "SESSION START"}</span><strong>${e(ev[mode])} · Toronto</strong></div><div><span>RACE DISTANCE</span><strong>${e(ev.laps)} laps</strong></div><div><span>MAP CODE</span><strong>${e(t?.code)}</strong></div></div>${eventRegistration(ev)}</div></div>${ev.status === "past" ? `<div class="section-head" style="margin-top:45px"><h3>${mode === "race" ? "RACE CLASSIFICATION" : "QUALIFYING CLASSIFICATION"}</h3></div><div class="table-wrap"><table><thead><tr><th>Position</th><th>Driver</th><th>${mode === "race" ? "Race time / gap" : "Fastest lap"}</th></tr></thead><tbody>${results.map((r, i) => `<tr><td class="number">${i + 1}</td><td>${driverCell(driver(r.driver))}</td><td class="lap">${e(mode === "race" ? r.time : r.qualifying)}</td></tr>`).join("") || '<tr><td colspan="3" class="empty">Results have not been added.</td></tr>'}</tbody></table></div>` : ""}</section>`;
+  return `<section class="page">${pageHeading("ROUND " + e(ev.round), e(ev.name), e(ev.description), '<a class="text-button" href="#events">← BACK TO EVENTS</a>')}${notice()}<div class="event-detail"><img src="${image(t)}" alt="${e(t?.name)} concept circuit"><div><span class="tag">${ev.status === "past" ? "COMPLETED" : "UPCOMING"}</span><h3 style="margin-top:25px"><a href="#track/${e(t?.id)}">${e(t?.name)} ↗</a></h3>${canAdmin() ? `<button class="text-button" data-action="event-results" data-id="${e(id)}">ENTER RESULTS ↗</button>` : ""}<div class="session-toggle">${["qualifying", "race"].map((s) => `<button data-action="session" data-id="${e(id)}" data-mode="${s}" class="${mode === s ? "selected" : ""}" aria-pressed="${mode === s}">${s === "race" ? "Race" : "Qualifying"}</button>`).join("")}</div><div class="detail-list"><div><span>DATE</span><strong>${date(ev.date)}</strong></div><div><span>${mode === "race" ? "LIGHTS OUT" : "SESSION START"}</span><strong>${e(ev[mode])} · Toronto</strong></div><div><span>RACE DISTANCE</span><strong>${e(ev.laps)} laps</strong></div><div><span>MAP CODE</span><strong>${e(t?.code)}</strong></div></div>${eventRegistration(ev)}</div></div>${resultTables(ev, mode)}</section>`;
 }
 const badgeIcons = {
   developer: '<path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16"/>',
@@ -189,6 +199,8 @@ const badgeIcons = {
   winner:
     '<path d="M8 3h8v7a4 4 0 0 1-8 0V3Zm4 11v5m-4 2h8M8 5H4v3a4 4 0 0 0 4 4m8-7h4v3a4 4 0 0 1-4 4"/>',
   pole: '<path d="M5 22V3m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0"/>',
+  map_developer:
+    '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15"/>',
   record:
     '<circle cx="12" cy="13" r="8"/><path d="M9 2h6m-3 7v5l3 2m4-13 2 2"/>',
 };
@@ -196,12 +208,20 @@ function badges(id, compact = false) {
   const role = roleFor(db, id),
     a = achievements(db, id),
     items = [];
+  const manual = new Set(
+    (db.badges || []).filter((b) => b.driver_id === id).map((b) => b.badge_key),
+  );
   if (role === "developer") items.push(["developer", "Developer", 0]);
   else if (role === "admin") items.push(["admin", "Admin", 0]);
+  if (manual.has("map_developer"))
+    items.push(["map_developer", "Map Developer", 0]);
   if (!compact) {
-    if (a.wins) items.push(["winner", "Event Winner", a.wins]);
-    if (a.poles) items.push(["pole", "Event Pole", a.poles]);
-    if (a.records) items.push(["record", "Lap Record", a.records]);
+    if (a.wins || manual.has("winner"))
+      items.push(["winner", "Event Winner", a.wins]);
+    if (a.poles || manual.has("pole"))
+      items.push(["pole", "Event Pole", a.poles]);
+    if (a.records || manual.has("record"))
+      items.push(["record", "Lap Record", a.records]);
   }
   return items.length
     ? `<span class="driver-badges ${compact ? "compact-badges" : ""}">${items.map(([kind, label, n]) => `<span class="driver-badge badge-${kind}" title="${label}${n ? " · " + n : ""}"><svg viewBox="0 0 24 24" aria-hidden="true">${badgeIcons[kind]}</svg><span>${label}</span>${n > 1 ? `<b>${n}</b>` : ""}</span>`).join("")}</span>`
@@ -341,12 +361,17 @@ function trackCard(t) {
   ];
   return `<article class="track-card track-mini"><a class="track-visual" href="#track/${e(t.id)}"><img src="${image(t)}" alt="${e(t.name)} circuit" loading="lazy"></a><div class="event-content"><div class="track-mini-meta"><span>MAP ${e(t.code)}</span><span>${date(t.released)}</span></div><h3><a href="#track/${e(t.id)}">${e(t.name)}</a></h3><p class="track-availability">${e(availability.join(" · "))}</p><div class="track-mini-record"><span>LAP RECORD</span><strong>${record ? formatLap(record.ms) : "—"}</strong></div><div class="event-bottom"><a class="text-button" href="#track/${e(t.id)}">VIEW TRACK ${arrow}</a>${adminPreview ? `<button class="text-button" data-action="edit-track" data-id="${e(t.id)}">EDIT ↗</button>` : `<a class="text-button" href="#submit/${e(t.id)}">SET A LAP ↗</a>`}</div></div></article>`;
 }
+function creatorAvatar(c) {
+  return c.avatar_url && safeURL(c.avatar_url)
+    ? `<img class="avatar creator-avatar" src="${e(safeURL(c.avatar_url))}" alt="${e(c.name)} avatar">`
+    : `<span class="avatar creator-avatar">${e(c.name.slice(0, 2).toUpperCase())}</span>`;
+}
 function trackDirectory() {
   return (
     db.creators
       .map(
         (c) =>
-          `<div class="creator-header"><div class="creator-title"><span class="avatar">${e(c.name.slice(0, 2).toUpperCase())}</span><div><h3>${e(c.name)}</h3><p>${e(c.description)}</p></div></div>${adminPreview ? `<button class="outline" data-action="add-track" data-id="${e(c.id)}">+ ADD TRACK</button>` : ""}</div><div class="track-grid">${
+          `<div class="creator-header"><div class="creator-title">${creatorAvatar(c)}<div><h3>${e(c.name)}</h3><p>${e(c.description)}</p></div></div>${adminPreview ? `<button class="outline" data-action="add-track" data-id="${e(c.id)}">+ ADD TRACK</button>` : ""}</div><div class="track-grid">${
             db.tracks
               .filter((t) => t.creator === c.id)
               .map(trackCard)
@@ -392,7 +417,7 @@ function submitPage(id) {
             .filter((x) => x.creator === t.creator)
             .map((x) => [x.id, x.name]),
           t.id,
-        )}</select></div><div class="field"><label for="lap-weather">WEATHER CONDITIONS</label><select id="lap-weather" name="weather" required>${options(t.weather)}</select></div><div class="field"><label for="lap-car">CAR CLASS</label><select id="lap-car" name="car" required>${options(t.cars)}</select></div><div class="field ${t.hasTires ? "" : "hidden"}" id="tire-field"><label for="lap-tire">TIRE COMPOUND</label><select id="lap-tire" name="tire" ${t.hasTires ? "required" : "disabled"}>${options(t.tires, "", "Select a tire compound")}</select><small>Only compounds available on this track can be used.</small></div><div class="field full ${t.cars[0] === "Customs" ? "" : "hidden"}" id="custom-field"><label for="lap-custom">CUSTOM CAR</label><input id="lap-custom" name="custom" list="custom-cars" placeholder="Type the exact car name…" maxlength="80"><datalist id="custom-cars">${[...new Set(db.laps.map((l) => l.custom).filter(Boolean))].map((c) => `<option value="${e(c)}">`).join("")}</datalist><small>Type your car name. The official custom car list can be added later.</small></div><div class="field full"><label for="lap-time">LAP TIME</label><input id="lap-time" name="time" placeholder="1:42.381" pattern="[0-9]{1,2}:[0-5][0-9]\\.[0-9]{3}" required inputmode="decimal"><small>Use M:SS.mmm — minutes, seconds, milliseconds.</small></div><div class="field full"><label for="lap-proof">VIDEO CLIP LINK · REQUIRED</label><input id="lap-proof" name="proof" type="url" placeholder="https://youtube.com/watch?v=…" required><small>Link a viewable clip of the entire lap, with the timer visible. YouTube, Twitch, Medal or another video host.</small></div><div class="checks full"><label><input type="checkbox" name="confirm" required> I confirm this is a complete, unedited lap.</label></div><p id="lap-error" class="error full" role="alert"></p><button class="button full" type="submit">SUBMIT FOR REVIEW ${arrow}</button></div></form><aside><div class="track-card"><div class="track-visual"><img id="submit-image" src="${image(t)}" alt="Selected track concept"></div><div class="event-content"><span class="tiny yellow">YOUR SELECTED CIRCUIT</span><h3 id="submit-track-name" style="margin-top:15px">${e(t.name)}</h3><p id="submit-track-desc">${e(t.description)}</p></div></div><div class="rule"><b>01</b><div><strong>Match your setup</strong>Track, weather, car and tire compound must match the conditions in your video.</div></div><div class="rule"><b>02</b><div><strong>Keep it clean</strong>Record the complete lap with the timer and track visible.</div></div><div class="rule"><b>03</b><div><strong>Wait for the green light</strong>An admin reviews your proof before your best lap reaches the board.</div></div></aside></div>`
+        )}</select></div><div class="field"><label for="lap-weather">WEATHER CONDITIONS</label><select id="lap-weather" name="weather" required>${options(t.weather)}</select></div><div class="field"><label for="lap-car">CAR CLASS</label><select id="lap-car" name="car" required>${options(t.cars)}</select></div><div class="field ${t.hasTires ? "" : "hidden"}" id="tire-field"><label for="lap-tire">TIRE COMPOUND</label><select id="lap-tire" name="tire" ${t.hasTires ? "required" : "disabled"}>${options(t.tires, "", "Select a tire compound")}</select><small>Only compounds available on this track can be used.</small></div><div class="field full ${t.cars[0] === "Customs" ? "" : "hidden"}" id="custom-field"><label for="lap-custom">CUSTOM CAR</label><input id="lap-custom" name="custom" list="custom-cars" placeholder="Type the exact car name…" maxlength="80"><datalist id="custom-cars">${[...new Set(db.laps.map((l) => l.custom).filter(Boolean))].map((c) => `<option value="${e(c)}">`).join("")}</datalist><small>Type your car name. The official custom car list can be added later.</small></div><div class="field full"><label for="lap-time">LAP TIME</label><input id="lap-time" name="time" placeholder="1:42.381" pattern="[0-9]{1,2}:[0-5][0-9]\\.[0-9]{3}" required inputmode="decimal"><small>Use M:SS.mmm — minutes, seconds, milliseconds.</small></div><fieldset class="field full proof-picker"><legend class="label">LAP VIDEO · REQUIRED</legend><div class="proof-modes"><label><input type="radio" name="proofMode" value="link" checked> Video link</label><label><input type="radio" name="proofMode" value="upload"> Upload clip</label></div><div id="proof-link-field"><label for="lap-proof">VIDEO LINK</label><input id="lap-proof" name="proof" type="url" placeholder="https://youtube.com/watch?v=…" required><small>Link a viewable, complete lap with the timer visible.</small></div><div id="proof-upload-field" hidden><label for="lap-clip">CHOOSE FROM YOUR DEVICE</label><input id="lap-clip" name="clipFile" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" disabled><small>MP4, WebM or MOV · up to 50 MB. For larger clips, use a video link.</small></div><p class="helper" id="clip-status" role="status"></p></fieldset><div class="checks full"><label><input type="checkbox" name="confirm" required> I confirm this is a complete, unedited lap.</label></div><p id="lap-error" class="error full" role="alert"></p><button class="button full" type="submit">SUBMIT FOR REVIEW ${arrow}</button></div></form><aside><div class="track-card"><div class="track-visual"><img id="submit-image" src="${image(t)}" alt="Selected track concept"></div><div class="event-content"><span class="tiny yellow">YOUR SELECTED CIRCUIT</span><h3 id="submit-track-name" style="margin-top:15px">${e(t.name)}</h3><p id="submit-track-desc">${e(t.description)}</p></div></div><div class="rule"><b>01</b><div><strong>Match your setup</strong>Track, weather, car and tire compound must match the conditions in your video.</div></div><div class="rule"><b>02</b><div><strong>Keep it clean</strong>Record the complete lap with the timer and track visible.</div></div><div class="rule"><b>03</b><div><strong>Wait for the green light</strong>An admin reviews your proof before your best lap reaches the board.</div></div></aside></div>`
   }</section>`;
 }
 function admin() {
@@ -440,7 +465,7 @@ function adminContent() {
       driverCell(d),
       e(d.country),
       date(d.registered),
-      `<button class="text-button" data-action="edit-driver" data-id="${e(d.id)}">Edit ↗</button> ${demo ? `<button class="text-button danger" data-action="delete-driver" data-id="${e(d.id)}">Remove</button>` : `<span class="pill">${d.active ? "Active" : "Inactive"}</span>`}`,
+      `<button class="text-button" data-action="edit-driver" data-id="${e(d.id)}">Edit ↗</button> <button class="text-button" data-action="edit-badges" data-id="${e(d.id)}">Badges ↗</button> ${demo ? `<button class="text-button danger" data-action="delete-driver" data-id="${e(d.id)}">Remove</button>` : `<span class="pill">${d.active ? "Active" : "Inactive"}</span>`}`,
     ]);
   }
   if (adminTab === "events") {
@@ -451,15 +476,16 @@ function adminContent() {
       e(track(v.track)?.name),
       date(v.date),
       e(v.status),
-      `<button class="text-button" data-action="edit-event" data-id="${e(v.id)}">Edit ↗</button> <button class="text-button danger" data-action="delete-event" data-id="${e(v.id)}">Remove</button>`,
+      `<button class="text-button" data-action="edit-event" data-id="${e(v.id)}">Edit ↗</button> <button class="text-button yellow" data-action="event-results" data-id="${e(v.id)}">Results ↗</button> <button class="text-button danger" data-action="delete-event" data-id="${e(v.id)}">Remove</button>`,
     ]);
   }
   if (adminTab === "creators") {
     add = "add-creator";
-    cols = ["Creator", "Tracks", "Actions"];
-    rows = db.creators.map((c) => [
-      e(c.name),
+    cols = ["Creator", "Tracks", "Order", "Actions"];
+    rows = db.creators.map((c, i) => [
+      `<span class="creator-cell">${creatorAvatar(c)}<strong>${e(c.name)}</strong></span>`,
       db.tracks.filter((t) => t.creator === c.id).length,
+      `<div class="order-controls"><button class="icon-button" data-action="creator-order" data-id="${e(c.id)}" data-direction="-1" aria-label="Move ${e(c.name)} up" ${i === 0 ? "disabled" : ""}>↑</button><button class="icon-button" data-action="creator-order" data-id="${e(c.id)}" data-direction="1" aria-label="Move ${e(c.name)} down" ${i === db.creators.length - 1 ? "disabled" : ""}>↓</button></div>`,
       `<button class="text-button" data-action="edit-creator" data-id="${e(c.id)}">Edit ↗</button> <button class="text-button danger" data-action="delete-creator" data-id="${e(c.id)}">Remove</button>`,
     ]);
   }
@@ -542,6 +568,8 @@ function render(scroll = false) {
                             : notFound();
   document.title = `${{ home: "Find your limit.", events: "Events", history: "Event history", drivers: "Driverbase", tracks: "Tracks", track: "Track details", "time-trials": "Time trials", submit: "Submit a lap", account: "My profile", admin: "Admin Panel", event: "Event details" }[page] || "Paddock"} — Fortnite Racing Association`;
   enhanceControls(app);
+  pageTransition(app, page, scroll);
+  if (!loading) finishBoot(!loadError);
   if (page === "home" && !loading && !loadError) {
     cleanCar = carScene($(".car-stage"));
     cleanTitle = titleMotion($(".hero-title"));
@@ -606,6 +634,14 @@ function editor(kind, id, creatorId) {
   if (kind === "creator")
     fields =
       field("name", "CREATOR NAME", o.name, "text", true, 'maxlength="80"') +
+      field(
+        "creator-avatar-url",
+        "AVATAR URL · OPTIONAL",
+        o.avatar_url || "",
+        "url",
+        false,
+      ) +
+      '<div class="field full"><label for="creator-avatar-file">UPLOAD CREATOR AVATAR</label><input id="creator-avatar-file" name="creatorAvatar" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG or WebP · up to 5 MB. Upload replaces the URL above.</small></div>' +
       `<div class="field full"><label for="f-description">DESCRIPTION</label><textarea id="f-description" name="description" maxlength="500">${e(o.description || "")}</textarea></div>`;
   if (kind === "track") {
     if (!db.creators.length) {
@@ -683,7 +719,7 @@ function editor(kind, id, creatorId) {
           ["no", "Closed"],
         ],
         o.registrationOpen === false ? "no" : "yes",
-      )}</select></div><div class="field full"><span class="label">SESSION RESULTS · OPTIONAL</span><div id="result-rows">${(o.results || []).map(resultRow).join("")}</div><button type="button" class="outline" data-action="add-result">+ ADD DRIVER RESULT</button><small>Add each finisher’s race position, race time or gap, and fastest qualifying lap.</small></div>`;
+      )}</select></div><p class="helper full">Save event details here, then use Results in the Events tab to enter qualifying lobbies and race classifications.</p>`;
   }
   showModal(
     `${obj ? "EDIT" : "ADD"} ${kind.toUpperCase()}`,
@@ -764,6 +800,17 @@ document.addEventListener("change", (ev) => {
     if (el.dataset.filter === "creator") boardFilters.track = "";
     if (el.dataset.filter === "car") boardFilters.custom = "";
     render();
+  }
+  if (el.id === "creator-avatar-file")
+    $("#f-creator-avatar-url").disabled = !!el.files?.[0]?.size;
+  if (el.name === "proofMode") {
+    const upload = el.value === "upload";
+    $("#proof-link-field").hidden = upload;
+    $("#proof-upload-field").hidden = !upload;
+    $("#lap-proof").required = !upload;
+    $("#lap-proof").disabled = upload;
+    $("#lap-clip").disabled = !upload;
+    $("#lap-clip").required = upload;
   }
   if (el.id === "driver-sort") {
     driverSort = el.value;
@@ -929,9 +976,83 @@ function profile(id) {
       )
       .join(
         "",
-      )}</div><details class="profile-records-section"><summary>Lap records <span>${records.length} ${arrow}</span></summary><div class="profile-records">${records.map((l) => `<a href="#track/${e(l.track)}" class="profile-record"><span>${e(track(l.track)?.name)}<small>${e(l.weather)} · ${e(l.custom || l.car)} · ${e(tireLabel(l))}</small></span><strong class="lap yellow">${formatLap(l.ms)}</strong></a>`).join("") || '<p class="helper">Your next fastest lap starts here.</p>'}</div></details><div class="profile-footer"><span class="helper">On the grid since ${date(d.registered)}</span><button class="outline" data-action="driver-history" data-id="${e(id)}">HISTORY ${arrow}</button></div></div>`,
+      )}</div><details class="profile-records-section"><summary>Lap records <span>${records.length} ${arrow}</span></summary><div class="profile-records">${records.map((l) => `<a href="#track/${e(l.track)}" class="profile-record"><span>${e(track(l.track)?.name)}<small>${e(l.weather)} · ${e(l.custom || l.car)} · ${e(tireLabel(l))}</small></span><strong class="lap yellow">${formatLap(l.ms)}</strong></a>`).join("") || '<p class="helper">Your next fastest lap starts here.</p>'}</div></details>${canAdmin() ? `<button class="text-button profile-badge-edit" data-action="edit-badges" data-id="${e(id)}">EDIT BADGES ↗</button>` : ""}<div class="profile-footer"><span class="helper">On the grid since ${date(d.registered)}</span><button class="outline" data-action="driver-history" data-id="${e(id)}">HISTORY ${arrow}</button></div></div>`,
     "profile-dialog",
   );
+}
+function badgeEditor(id) {
+  const d = driver(id);
+  if (!d?.complete) {
+    toast("Choose a registered driver.");
+    return;
+  }
+  const current = new Set(
+    (db.badges || []).filter((b) => b.driver_id === id).map((b) => b.badge_key),
+  );
+  showModal(
+    "BADGES · " + d.name,
+    `<form id="badge-form" data-id="${e(id)}"><p class="helper">Race achievements are awarded automatically. You can also award these display badges manually. Developer and Admin badges reflect website access roles.</p><div class="badge-choices">${[
+      ["map_developer", "Map Developer"],
+      ["winner", "Event Winner"],
+      ["pole", "Event Pole"],
+      ["record", "Lap Record"],
+    ]
+      .map(
+        ([key, label]) =>
+          `<label><input type="checkbox" name="badges" value="${key}" ${current.has(key) ? "checked" : ""}><span class="driver-badge badge-${key}"><svg viewBox="0 0 24 24" aria-hidden="true">${badgeIcons[key]}</svg>${label}</span></label>`,
+      )
+      .join(
+        "",
+      )}</div><p class="helper">Removing a manual award keeps any badge the driver has earned through results.</p><p class="error" id="badge-error" role="alert"></p><div class="form-actions"><button type="button" class="outline" data-action="close">CANCEL</button><button type="submit" class="button">SAVE BADGES ↗</button></div></form>`,
+  );
+}
+function sessionRow(r, kind, index) {
+  const name = driver(r.driver)?.name || "";
+  return `<tr><td class="row-number">${index + 1}</td><td><input class="result-driver" data-driver-picker list="result-driver-options" aria-label="Driver row ${index + 1}" placeholder="Type driver name…" value="${e(name)}" autocomplete="off"></td><td><input class="result-time" aria-label="${kind === "qualifying" ? "Lap" : "Race"} time row ${index + 1}" placeholder="${kind === "qualifying" ? "1:42.381" : "24:15.000 / +3.214 / DNF"}" value="${e(kind === "qualifying" ? (r.ms ? formatLap(r.ms) : r.time || "") : r.time || "")}"></td><td><div class="order-controls"><button type="button" class="icon-button" data-action="move-session-row" data-direction="-1" aria-label="Move row up">↑</button><button type="button" class="icon-button" data-action="move-session-row" data-direction="1" aria-label="Move row down">↓</button><button type="button" class="icon-button danger" data-action="remove-session-row" aria-label="Remove result row">×</button></div></td></tr>`;
+}
+function sessionMarkup(s) {
+  const rows = s.results || [];
+  return `<section class="result-session" data-kind="${s.kind}"><div class="session-editor-head"><span class="session-kind">${s.kind === "qualifying" ? "QUALIFYING" : "RACE"}</span><input class="session-name" aria-label="Session name" maxlength="60" required value="${e(s.name)}"><button type="button" class="text-button danger" data-action="remove-result-session">REMOVE SESSION</button></div><p class="helper">${s.kind === "qualifying" ? "Enter lap times. Positions and pole are calculated from fastest to slowest." : "Rows are finishing order. Enter total time, gap, DNF or DNS. Use the arrows to reorder finishers."}</p><div class="results-table-wrap"><table class="results-entry-table"><thead><tr><th>${s.kind === "qualifying" ? "Row" : "Finish"}</th><th>Driver</th><th>${s.kind === "qualifying" ? "Lap time" : "Race time / gap"}</th><th>Order</th></tr></thead><tbody>${Array.from({ length: Math.max(8, rows.length + 2) }, (_, i) => sessionRow(rows[i] || {}, s.kind, i)).join("")}</tbody></table></div><button type="button" class="text-button" data-action="add-session-rows">+ ADD 5 ROWS</button></section>`;
+}
+function resultsEditor(id) {
+  const ev = db.events.find((x) => x.id === id);
+  if (!ev) return;
+  const sessions = sessionsForEvent(ev);
+  showModal(
+    "RESULTS · " + ev.name,
+    `<form id="results-form" data-id="${e(id)}"><p class="helper">Create separate lobbies or sessions. Blank rows are ignored. Results become achievement badges when the event is marked completed.</p><datalist id="result-driver-options">${db.drivers
+      .filter((d) => d.complete)
+      .map((d) => `<option value="${e(d.name)}">`)
+      .join("")}</datalist><div id="result-sessions">${(sessions.length
+      ? sessions
+      : [
+          { kind: "qualifying", name: "Qualifying 1", results: [] },
+          { kind: "race", name: "Race 1", results: [] },
+        ]
+    )
+      .map(sessionMarkup)
+      .join(
+        "",
+      )}</div><div class="result-session-actions"><button type="button" class="outline" data-action="add-result-session" data-kind="qualifying">+ QUALIFYING LOBBY</button><button type="button" class="outline" data-action="add-result-session" data-kind="race">+ RACE SESSION</button></div><p class="error" id="results-error" role="alert"></p><div class="form-actions result-save"><button type="button" class="outline" data-action="close">CANCEL</button><button type="submit" class="button">SAVE ALL RESULTS ↗</button></div></form>`,
+    "results-dialog",
+  );
+}
+function resultTables(ev, mode) {
+  const sessions = sessionsForEvent(ev).filter((s) => s.kind === mode);
+  if (!sessions.length)
+    return ev.status === "past"
+      ? '<p class="empty">Results have not been added.</p>'
+      : "";
+  return sessions
+    .map((s) => {
+      const results = [...s.results].sort((a, b) =>
+        mode === "qualifying"
+          ? a.ms - b.ms || a.driver.localeCompare(b.driver)
+          : a.position - b.position,
+      );
+      return `<div class="section-head result-heading"><h3>${e(s.name)}</h3><span class="tiny muted">${results.length} DRIVERS</span></div><div class="table-wrap"><table><thead><tr><th>Position</th><th>Driver</th><th>${mode === "race" ? "Race time / gap" : "Fastest lap"}</th></tr></thead><tbody>${results.map((r, i) => `<tr><td class="number">${i + 1}</td><td>${driverCell(driver(r.driver))}</td><td class="lap">${e(mode === "race" ? r.time : formatLap(r.ms))}</td></tr>`).join("") || '<tr><td colspan="3" class="empty">No results yet.</td></tr>'}</tbody></table></div>`;
+    })
+    .join("");
 }
 function driverHistory(id) {
   const d = driver(id);
@@ -1029,6 +1150,95 @@ document.addEventListener("click", async (ev) => {
     return render();
   }
   if (a === "profile") return profile(id);
+  if (a === "edit-badges") {
+    requireAdmin();
+    return badgeEditor(id);
+  }
+  if (a === "event-results") {
+    requireAdmin();
+    return resultsEditor(id);
+  }
+  if (a === "add-result-session") {
+    const list = $("#result-sessions");
+    list.insertAdjacentHTML(
+      "beforeend",
+      sessionMarkup({
+        kind: b.dataset.kind,
+        name:
+          (b.dataset.kind === "race" ? "Race" : "Qualifying") +
+          " " +
+          (list.querySelectorAll(`[data-kind="${b.dataset.kind}"]`).length + 1),
+        results: [],
+      }),
+    );
+    enhanceControls(modal);
+    return;
+  }
+  if (a === "remove-result-session") {
+    b.closest(".result-session").remove();
+    return;
+  }
+  if (a === "add-session-rows") {
+    const block = b.closest(".result-session"),
+      body = block.querySelector("tbody");
+    for (let n = 0; n < 5; n++)
+      body.insertAdjacentHTML(
+        "beforeend",
+        sessionRow({}, block.dataset.kind, body.children.length),
+      );
+    enhanceControls(modal);
+    return;
+  }
+  if (a === "remove-session-row" || a === "move-session-row") {
+    const row = b.closest("tr"),
+      body = row.parentElement;
+    if (a === "remove-session-row") row.remove();
+    else {
+      const other =
+        b.dataset.direction === "-1"
+          ? row.previousElementSibling
+          : row.nextElementSibling;
+      if (other)
+        body.insertBefore(
+          b.dataset.direction === "-1" ? row : other,
+          b.dataset.direction === "-1" ? other : row,
+        );
+    }
+    [...body.children].forEach((r, i) => {
+      r.querySelector(".row-number").textContent = i + 1;
+      r.querySelector(".result-driver").setAttribute(
+        "aria-label",
+        "Driver row " + (i + 1),
+      );
+      r.querySelector(".result-time").setAttribute(
+        "aria-label",
+        (body.closest(".result-session").dataset.kind === "qualifying"
+          ? "Lap"
+          : "Race") +
+          " time row " +
+          (i + 1),
+      );
+    });
+    return;
+  }
+  if (a === "creator-order")
+    return writeAction(b, async () => {
+      requireAdmin();
+      const ids = db.creators.map((c) => c.id),
+        i = ids.indexOf(id),
+        j = i + Number(b.dataset.direction);
+      if (j < 0 || j >= ids.length) return;
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+      if (demo) {
+        db.creators.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+        commit();
+        render();
+      } else {
+        await backend.reorderCreators(ids);
+        await refresh();
+      }
+      toast("Creator order saved.");
+    });
   if (a === "driver-history") return driverHistory(id);
   if (a === "retry") {
     loading = true;
@@ -1090,9 +1300,18 @@ document.addEventListener("click", async (ev) => {
   if (a === "proof") {
     const l = db.laps.find((x) => x.id === id);
     if (!l) return;
+    let uploadedURL = "";
+    if (l.storagePath) {
+      try {
+        uploadedURL = await backend.clipURL(l.storagePath);
+      } catch (err) {
+        toast(err.message || "Unable to open this clip.");
+        return;
+      }
+    }
     showModal(
       "LAP PROOF",
-      `<h3>${e(driver(l.driver)?.name)} · ${formatLap(l.ms)}</h3><p class="helper">${e(track(l.track)?.name)} · ${e(l.weather)} · ${e(l.custom || l.car)} · ${e(tireLabel(l))}</p>${safeURL(l.proof) ? `<a class="button" href="${e(safeURL(l.proof))}" target="_blank" rel="noopener noreferrer">OPEN VIDEO CLIP ↗</a>` : '<p class="helper">No clip attached to this sample record.</p>'}${l.status === "pending" && canAdmin() ? `<p class="helper">Check the complete lap, setup and timer before approval.</p><div class="form-actions"><button class="outline" data-action="reject" data-id="${e(id)}">REJECT LAP</button><button class="button" data-action="approve" data-id="${e(id)}">APPROVE LAP ↗</button></div>` : `<span class="pill ${e(l.status)}">${e(l.status)}</span>`}`,
+      `<h3>${e(driver(l.driver)?.name)} · ${formatLap(l.ms)}</h3><p class="helper">${e(track(l.track)?.name)} · ${e(l.weather)} · ${e(l.custom || l.car)} · ${e(tireLabel(l))}</p>${uploadedURL ? `<video class="lap-video" controls playsinline preload="metadata" src="${e(uploadedURL)}"></video><a class="text-button" href="${e(uploadedURL)}" target="_blank" rel="noopener noreferrer">OPEN CLIP ↗</a>` : safeURL(l.proof) ? `<a class="button" href="${e(safeURL(l.proof))}" target="_blank" rel="noopener noreferrer">OPEN VIDEO CLIP ↗</a>` : '<p class="helper">No clip attached to this sample record.</p>'}${l.status === "pending" && canAdmin() ? `<p class="helper">Check the complete lap, setup and timer before approval.</p><div class="form-actions"><button class="outline" data-action="reject" data-id="${e(id)}">REJECT LAP</button><button class="button" data-action="approve" data-id="${e(id)}">APPROVE LAP ↗</button></div>` : `<span class="pill ${e(l.status)}">${e(l.status)}</span>`}`,
     );
     return;
   }
@@ -1199,12 +1418,58 @@ document.addEventListener("submit", (ev) => {
       "password-form": "#password-error",
       "edit-form": "#edit-error",
       "reject-form": "#reject-error",
+      "badge-form": "#badge-error",
+      "results-form": "#results-error",
     }[f.id];
   if (!errorSelector) return;
   $(errorSelector).textContent = "";
   writeAction(
     f.querySelector('[type="submit"]'),
     async () => {
+      if (f.id === "badge-form") {
+        requireAdmin();
+        const assigned = fd.getAll("badges");
+        if (demo) {
+          db.badges = (db.badges || []).filter(
+            (b) => b.driver_id !== f.dataset.id,
+          );
+          assigned.forEach((b) =>
+            db.badges.push({ driver_id: f.dataset.id, badge_key: b }),
+          );
+          commit();
+        } else {
+          await backend.setBadges(f.dataset.id, assigned);
+          await refresh();
+        }
+        closeModal();
+        render();
+        toast("Driver badges saved.");
+        return;
+      }
+      if (f.id === "results-form") {
+        requireAdmin();
+        const raw = [...f.querySelectorAll(".result-session")].map((block) => ({
+          kind: block.dataset.kind,
+          name: block.querySelector(".session-name").value,
+          results: [...block.querySelectorAll("tbody tr")].map((row) => ({
+            name: row.querySelector(".result-driver").value,
+            time: row.querySelector(".result-time").value,
+          })),
+        }));
+        const sessions = normalizeSessions(raw, db.drivers);
+        if (demo) {
+          const ev = db.events.find((e) => e.id === f.dataset.id);
+          ev.sessions = sessions;
+          commit();
+        } else {
+          await backend.saveSessions(f.dataset.id, sessions);
+          await refresh();
+        }
+        closeModal();
+        render();
+        toast("Session results saved. Badges updated.");
+        return;
+      }
       if (f.id === "email-auth-form") {
         authEmail = v.email.trim();
         authNotice = "";
@@ -1300,8 +1565,14 @@ document.addEventListener("submit", (ev) => {
         if (v.car === "Customs" && !v.custom.trim())
           throw Error("Enter the custom car name.");
         if (ms <= 0) throw Error("Enter a lap time such as 1:42.381.");
-        if (!/^https:\/\//i.test(v.proof) || !safeURL(v.proof))
+        const upload = v.proofMode === "upload",
+          clip = fd.get("clipFile");
+        if (!upload && (!/^https:\/\//i.test(v.proof) || !safeURL(v.proof)))
           throw Error("Add an HTTPS video clip link.");
+        if (upload && !clip?.size)
+          throw Error("Choose a video clip from your device.");
+        if (upload && demo)
+          throw Error("Device uploads are available on the connected website.");
         if (!v.confirm)
           throw Error("Confirm your lap is complete and unedited.");
         const l = {
@@ -1313,7 +1584,8 @@ document.addEventListener("submit", (ev) => {
           custom: v.car === "Customs" ? v.custom.trim() : "",
           ms,
           tire: t.hasTires ? v.tire : "",
-          proof: v.proof,
+          proof: upload ? "" : v.proof,
+          storagePath: "",
           date: new Date().toISOString().slice(0, 10),
           status: "pending",
         };
@@ -1321,7 +1593,17 @@ document.addEventListener("submit", (ev) => {
           db.laps.push(l);
           commit();
         } else {
-          await backend.submitLap(l);
+          try {
+            if (upload) {
+              $("#clip-status").textContent =
+                "Uploading your clip… Keep this page open.";
+              l.storagePath = await backend.uploadLapClip(clip);
+            }
+            await backend.submitLap(l);
+          } catch (error) {
+            if (l.storagePath) await backend.removeUnusedClip(l.storagePath);
+            throw error;
+          }
           await refresh();
         }
         showModal(
@@ -1361,6 +1643,21 @@ document.addEventListener("submit", (ev) => {
           )
             throw Error("Use HTTPS image URLs.");
         }
+        if (kind === "creator") {
+          o.avatar_url = v["creator-avatar-url"] || "";
+          if (
+            o.avatar_url &&
+            (!/^https:\/\//i.test(o.avatar_url) || !safeURL(o.avatar_url))
+          )
+            throw Error("Use an HTTPS image URL.");
+          if (fd.get("creatorAvatar")?.size)
+            o.avatar_url = await backend.uploadCreatorAvatar(
+              fd.get("creatorAvatar"),
+            );
+          o.sort_order =
+            old?.sort_order ??
+            Math.max(-1, ...db.creators.map((c) => c.sort_order || 0)) + 1;
+        }
         if (kind === "track") {
           o.weather = fd.getAll("weather");
           o.cars = fd.getAll("cars");
@@ -1379,27 +1676,7 @@ document.addEventListener("submit", (ev) => {
           o.timezone = "America/Toronto";
           o.registrationOpen = v.registrationOpen === "yes";
           if (!track(o.track)) throw Error("Choose an existing track.");
-          o.results = fd.getAll("resultDriver").map((d, i) => ({
-            driver: d,
-            position: Number(fd.getAll("resultPos")[i]),
-            time: fd.getAll("resultTime")[i].trim(),
-            qualifying: fd.getAll("resultQuali")[i].trim(),
-          }));
-          if (
-            o.results.some(
-              (r) =>
-                !driver(r.driver) ||
-                !Number.isInteger(r.position) ||
-                r.position < 1 ||
-                !r.time ||
-                !parseLap(r.qualifying),
-            ) ||
-            new Set(o.results.map((r) => r.driver)).size !== o.results.length ||
-            new Set(o.results.map((r) => r.position)).size !== o.results.length
-          )
-            throw Error(
-              "Results need unique drivers and positions, a race time or gap, and a qualifying lap in M:SS.mmm format.",
-            );
+          o.results = old?.results || [];
           if (o.qualifying >= o.race)
             throw Error("Qualifying must start before the race.");
           for (const k of Object.keys(o))

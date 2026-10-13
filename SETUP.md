@@ -18,7 +18,7 @@ In the new FRA project, open **SQL Editor** → **New query**. Copy the complete
 
 `supabase/migrations/202610120001_fra.sql`
 
-Run it once. Then run `supabase/migrations/202610120002_access_indexes.sql` in a second query, followed by `supabase/migrations/20261012224350_fra_email_registration.sql` in a third query. Finally run `supabase/migrations/20261013013150_fra_developer_roles.sql` in a fourth query. Together they create drivers for Discord and email accounts, creators, tracks, events, event entries/results, lap submissions, country choices, computed statistics/history, admin permission checks and the `driver-media` image bucket. They do not add sample drivers or events. Use a fresh FRA project; do not run them against another application's existing database. All four have already been applied to the owner's FRA project; do not rerun them there.
+Run it once. Then run `supabase/migrations/202610120002_access_indexes.sql` in a second query, followed by `supabase/migrations/20261012224350_fra_email_registration.sql` in a third query. Then run `supabase/migrations/20261013013150_fra_developer_roles.sql` in a fourth query. Finally run `supabase/migrations/20261013024405_fra_racing_management.sql` in a fifth query. Together they create drivers for Discord and email accounts, creators, tracks, events, event entries/results, lap submissions, country choices, computed statistics/history, admin permission checks and the driver-media, creator-media and private lap-clips storage buckets. They also support ordered creator avatars, manual display badges and named qualifying/race result sessions. They do not add sample drivers or events. Use a fresh FRA project; do not run them against another application's existing database. All five have already been applied to the owner's FRA project; do not rerun them there.
 
 If the query fails, the transaction rolls back. Fix the reported issue before rerunning. After a successful run, do not rerun the same migration: it is a one-time schema setup, not an update script.
 
@@ -113,10 +113,10 @@ The role takes effect at the database immediately; reload the website to update 
 2. Add **Tracks** under each creator with the real map code, release date, hero image URL, description, supported weather and car classes.
 3. Choose whether the track offers tires. If enabled, tick one or more of Ultrasoft, Soft, Medium, Hard, Ultrahard, Intermediate and Wet.
 4. Add an event and select a track from the list. Set the date, qualifying/race times, lap count and registration status.
-5. After a race, edit the event, mark it completed and enter driver results with unique race positions and qualifying times. Their stats/history and earned Event Winner/Event Pole badges update automatically. Current approved overall track record holders receive the Lap Record badge.
+5. After a race, use Events → Results to enter named qualifying lobbies and race sessions in the tables, then mark the event completed. Qualifying lobbies sort by lap time; race rows are finishing order. Their stats/history and earned Event Winner/Event Pole badges update automatically. Current approved overall track record holders receive the Lap Record badge.
 6. Review video clips under **Submissions** before approving or rejecting laps. A rejection requires a note.
 
-Drivers register themselves using email/password or Discord. In the Admin Panel you can edit their profile information and set them inactive. Inactive drivers retain past results but cannot enter events or submit laps. Authentication accounts are managed separately in Supabase; the website intentionally does not delete accounts/history.
+Drivers register themselves using email/password or Discord. In the Admin Panel you can edit their profile information and set them inactive. Inactive drivers retain past results but cannot enter events or submit laps. Authentication accounts are managed separately in Supabase; the website intentionally does not delete accounts/history. Creator order/avatars are managed under Creators; manual display badges under Drivers → Badges. See RACING-UPDATE.md for the full workflow.
 
 ## 9. Verify before opening registration to everyone
 
@@ -125,7 +125,7 @@ Use your admin account and a separate ordinary email account:
 - Complete the second driver's profile with a country chosen by typing into the dropdown. Check avatar/banner uploads.
 - Confirm the ordinary driver cannot open the Admin Panel or edit another driver.
 - Create a track with tires and enter an upcoming event from the second account. Check its entry appears on the profile.
-- Submit a lap with video proof. Check it stays off the public leaderboard until an admin approves it.
+- Submit a lap with a video link, then check a private device clip upload (MP4/WebM/MOV up to 50 MB). Check it stays off the public leaderboard until an admin approves it.
 - Approve it and confirm the leaderboard, track lap record and driver lap-record count update.
 - Complete an event and add results. Check entered/won/podium counts and scrollable event history.
 - Sign out and verify public profiles, approved laps, tracks and events remain visible.
