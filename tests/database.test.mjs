@@ -25,7 +25,7 @@ const lapSQL = `insert into public.laps(driver_id,track_id,weather,car_class,cus
 test("FRA migration and database access rules", async (t) => {
   pg = new PGlite();
   await pg.exec(`create role anon;create role authenticated;create schema auth;create schema storage;
- create table auth.users(id uuid primary key,raw_app_meta_data jsonb,raw_user_meta_data jsonb);
+ create table auth.users(id uuid primary key,raw_app_meta_data jsonb,raw_user_meta_data jsonb,created_at timestamptz default now());
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema public,auth,storage to anon,authenticated;grant execute on function auth.uid() to anon,authenticated;
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -42,12 +42,78 @@ test("FRA migration and database access rules", async (t) => {
         "utf8",
       ),
     );
+  const emailDriver = "55555555-5555-4555-8555-555555555555";
+  await root(
+    `insert into auth.users(id,raw_app_meta_data,raw_user_meta_data) values($1,'{"provider":"email"}','{}')`,
+    [emailDriver],
+  );
+  await pg.exec(
+    await readFile(
+      new URL(
+        "../supabase/migrations/20261012224350_fra_email_registration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   for (const id of [owner, other, incomplete, admin])
     await root(
-      `insert into auth.users values($1,'{"provider":"discord"}','{"avatar_url":"https://cdn.discordapp.com/avatar.png"}')`,
+      `insert into auth.users(id,raw_app_meta_data,raw_user_meta_data) values($1,'{"provider":"discord"}','{"avatar_url":"https://cdn.discordapp.com/avatar.png"}')`,
       [id],
     );
   await root("insert into private.admin_users(user_id) values($1)", [admin]);
+  await t.test(
+    "email profiles are backfilled and new email users get the same onboarding and ownership rules",
+    async () => {
+      assert.equal(
+        (
+          await root("select is_registered from public.drivers where id=$1", [
+            emailDriver,
+          ])
+        ).rows[0].is_registered,
+        false,
+      );
+      const fresh = "66666666-6666-4666-8666-666666666666";
+      await root(
+        `insert into auth.users(id,raw_app_meta_data,raw_user_meta_data) values($1,'{"provider":"email"}','{"admin":true,"provider":"discord","avatar_url":"https://example.com/fake.png"}')`,
+        [fresh],
+      );
+      const d = (
+        await root("select * from public.drivers where id=$1", [fresh])
+      ).rows[0];
+      assert.equal(d.is_registered, false);
+      assert.equal(d.avatar_url, "");
+      assert.equal(
+        (await as("authenticated", fresh, "select public.is_admin() as admin"))
+          .rows[0].admin,
+        false,
+      );
+      assert.equal(
+        (
+          await as(
+            "authenticated",
+            fresh,
+            "update public.drivers set username='Email Racer',country_code='CA' where id=$1 returning is_registered",
+            [fresh],
+          )
+        ).rows[0].is_registered,
+        true,
+      );
+      assert.equal(
+        (
+          await as(
+            "authenticated",
+            fresh,
+            "update public.drivers set username='Stolen' where id=$1 returning id",
+            [owner],
+          )
+        ).rows.length,
+        0,
+      );
+      await root("delete from public.drivers where id=$1", [fresh]);
+      await root("delete from auth.users where id=$1", [fresh]);
+    },
+  );
   await t.test(
     "Discord trigger creates incomplete drivers and country catalogue",
     async () => {
@@ -163,14 +229,47 @@ test("FRA migration and database access rules", async (t) => {
     );
   });
   let lapId;
-  await t.test("unsupported setups and inactive drivers are rejected", async () => {
-    await assert.rejects(as("authenticated", owner, lapSQL.replace("'Dry'", "'Heavy Rain'"), [owner, tid, "Soft"]), /Weather is not available/);
-    await assert.rejects(as("authenticated", owner, lapSQL.replace("'Prevalents'", "'Whiplashes'"), [owner, tid, "Soft"]), /Car class is not available/);
-    await assert.rejects(as("authenticated", owner, lapSQL.replace("'Prevalents'", "'Customs'"), [owner, tid, "Soft"]), /custom car name/);
-    await root("update public.drivers set is_active=false where id=$1", [other]);
-    await assert.rejects(as("authenticated", other, lapSQL, [other, tid, "Soft"]), /row-level security/);
-    await root("update public.drivers set is_active=true where id=$1", [other]);
-  });
+  await t.test(
+    "unsupported setups and inactive drivers are rejected",
+    async () => {
+      await assert.rejects(
+        as("authenticated", owner, lapSQL.replace("'Dry'", "'Heavy Rain'"), [
+          owner,
+          tid,
+          "Soft",
+        ]),
+        /Weather is not available/,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          owner,
+          lapSQL.replace("'Prevalents'", "'Whiplashes'"),
+          [owner, tid, "Soft"],
+        ),
+        /Car class is not available/,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          owner,
+          lapSQL.replace("'Prevalents'", "'Customs'"),
+          [owner, tid, "Soft"],
+        ),
+        /custom car name/,
+      );
+      await root("update public.drivers set is_active=false where id=$1", [
+        other,
+      ]);
+      await assert.rejects(
+        as("authenticated", other, lapSQL, [other, tid, "Soft"]),
+        /row-level security/,
+      );
+      await root("update public.drivers set is_active=true where id=$1", [
+        other,
+      ]);
+    },
+  );
   await t.test(
     "lap ownership, setup validation, moderation and visibility",
     async () => {

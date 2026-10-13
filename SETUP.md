@@ -18,7 +18,7 @@ In the new FRA project, open **SQL Editor** → **New query**. Copy the complete
 
 `supabase/migrations/202610120001_fra.sql`
 
-Run it once. Then run `supabase/migrations/202610120002_access_indexes.sql` in a second query. Together they create drivers, creators, tracks, events, event entries/results, lap submissions, country choices, computed statistics/history, admin permission checks and the `driver-media` image bucket. It does not add sample drivers or events. Use a fresh FRA project; do not run it against another application's existing database.
+Run it once. Then run `supabase/migrations/202610120002_access_indexes.sql` in a second query, followed by `supabase/migrations/20261012224350_fra_email_registration.sql` in a third query. Together they create drivers for Discord and email accounts, creators, tracks, events, event entries/results, lap submissions, country choices, computed statistics/history, admin permission checks and the `driver-media` image bucket. They do not add sample drivers or events. Use a fresh FRA project; do not run them against another application's existing database. All three have already been applied to the owner's FRA project; do not rerun them there.
 
 If the query fails, the transaction rolls back. Fix the reported issue before rerunning. After a successful run, do not rerun the same migration: it is a one-time schema setup, not an update script.
 
@@ -77,13 +77,13 @@ In Supabase, open **Authentication → URL Configuration**:
 
 No `#account` hash is needed in these settings. The website handles the callback at its root and then opens the appropriate page. Avoid allowing arbitrary preview domains to redirect to your production database.
 
-In Supabase authentication settings, leave new-user signups enabled and use Discord as the sign-in provider. Disable providers you do not plan to use; this version creates driver profiles for Discord signups only.
+In Supabase **Authentication → Sign In / Providers**, leave new-user signups enabled, enable **Email** and keep **Discord** enabled. Turn **Confirm email** off and save. Drivers can then enter an email and a password of at least eight characters, sign in immediately, and complete their driver profile. This flow needs no SMTP service. The website also provides email/password login. No password-reset email flow is included.
 
 ## 7. Register yourself and enable admin access
 
-1. Open your website → **Register with Discord**.
-2. Authorize the FRA application. Finish the driver profile with a name and country. Upload a profile picture if you want to replace your Discord image; the banner is optional.
-3. In Supabase **Authentication → Users**, find your own Discord user and copy its **User UID**. Match the account carefully.
+1. Open your website → **Register / Log in**.
+2. Choose **Create account** and enter an email/password, or **Continue with Discord** and authorize the FRA application. Finish the driver profile with a name and country. Upload a profile picture if desired; the banner is optional.
+3. In Supabase **Authentication → Users**, find your own user and copy its **User UID**. Match the account carefully.
 4. In Supabase **SQL Editor**, replace the placeholder below with your actual User UID and run:
 
 ```sql
@@ -101,7 +101,7 @@ delete from private.admin_users
 where user_id = 'USER_UID_TO_REMOVE'::uuid;
 ```
 
-The role takes effect at the database immediately; reload the website to update visible controls. Admins use the same Discord sign-in as drivers.
+The role takes effect at the database immediately; reload the website to update visible controls. Admins use the same email/password or Discord sign-in as drivers. An existing Discord driver can set a password from **My profile → Email sign-in** to use their current account's email without creating another profile.
 
 ## 8. Build the real calendar
 
@@ -112,11 +112,11 @@ The role takes effect at the database immediately; reload the website to update 
 5. After a race, edit the event, mark it completed and enter driver results with unique race positions and qualifying times. Their stats/history update automatically.
 6. Review video clips under **Submissions** before approving or rejecting laps. A rejection requires a note.
 
-Drivers register themselves using Discord. In race control you can edit their profile information and set them inactive. Inactive drivers retain past results but cannot enter events or submit laps. Authentication accounts are managed separately in Supabase; the website intentionally does not delete accounts/history.
+Drivers register themselves using email/password or Discord. In race control you can edit their profile information and set them inactive. Inactive drivers retain past results but cannot enter events or submit laps. Authentication accounts are managed separately in Supabase; the website intentionally does not delete accounts/history.
 
 ## 9. Verify before opening registration to everyone
 
-Use your admin account and a second ordinary Discord account:
+Use your admin account and a separate ordinary email account:
 
 - Complete the second driver's profile with a country chosen by typing into the dropdown. Check avatar/banner uploads.
 - Confirm the ordinary driver cannot open race control or edit another driver.
@@ -125,12 +125,14 @@ Use your admin account and a second ordinary Discord account:
 - Approve it and confirm the leaderboard, track lap record and driver lap-record count update.
 - Complete an event and add results. Check entered/won/podium counts and scrollable event history.
 - Sign out and verify public profiles, approved laps, tracks and events remain visible.
+- Sign back in with that email/password and verify the same profile and history return. Also check Discord login still works for the existing Discord driver.
 
 Automated database access tests are included (`npm ci`, then `npm test`). They run locally without connecting to your project. Live Discord authorization, storage upload behavior and Cloudflare deployment need this final account-based check.
 
 ## Troubleshooting
 
 - **Discord redirect error**: Discord's redirect must be the Supabase `/auth/v1/callback` URL; Supabase's allowed redirect must be your website root URL, including its trailing slash.
+- **Email account awaits confirmation**: disable **Confirm email** in Supabase Authentication → Sign In / Providers. If a test account was created before switching it off, that account may still need confirmation in Supabase; new signups use the new setting.
 - **Login returns without signing in**: use the same browser throughout the flow. A PKCE verifier is stored by that browser. Start a fresh sign-in if the callback link is old or already used.
 - **Paddock temporarily unavailable**: check the migration ran, the project is awake, and Cloudflare's URL/key point to that same project. Check browser console/network errors for the detailed connection error.
 - **Race control missing**: check your UID in `private.admin_users`, then reload. Editing profile metadata cannot grant admin access.
@@ -141,6 +143,7 @@ Automated database access tests are included (`npm ci`, then `npm test`). They r
 
 ## Official references
 
+- [Supabase: email/password authentication](https://supabase.com/docs/guides/auth/passwords)
 - [Supabase: Discord sign-in](https://supabase.com/docs/guides/auth/social-login/auth-discord)
 - [Supabase: redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls)
 - [Supabase: database access policies](https://supabase.com/docs/guides/database/postgres/row-level-security)

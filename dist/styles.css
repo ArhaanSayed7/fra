@@ -1781,3 +1781,69 @@ button:disabled {
     display: none;
   }
 }
+
+/* Email and Discord use the same driver account. */
+.auth-switch {
+  display: flex;
+  padding: 5px;
+  gap: 5px;
+  background: #10110f;
+  border: 1px solid var(--line);
+  margin-bottom: 26px;
+}
+.auth-switch button {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  padding: 14px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.auth-switch button.selected {
+  background: var(--yellow);
+  color: #111;
+}
+.auth-form {
+  display: grid;
+  gap: 18px;
+  text-align: left;
+}
+.auth-form .button,
+.auth-discord {
+  width: 100%;
+  justify-content: center;
+}
+.auth-form .error:empty,
+.auth-notice:empty {
+  display: none;
+}
+.auth-notice {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--yellow);
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--muted);
+  font-size: 11px;
+  margin: 25px 0;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--line);
+}
+.password-settings {
+  margin-top: 20px;
+}
+.password-settings .field {
+  margin-bottom: 12px;
+}
+.password-settings .outline {
+  margin-top: 18px;
+}

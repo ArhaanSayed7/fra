@@ -63,3 +63,7 @@ Open your Pages address and sign in with Discord as Rivers. Confirm you return t
 - **Missing styling, fonts or car:** commit the entire `dist/assets` folder and `dist/styles.css`.
 
 Official references: [Cloudflare Pages Git setup](https://developers.cloudflare.com/pages/get-started/git-integration/) and [build configuration](https://developers.cloudflare.com/pages/configuration/build-configuration/).
+
+## Email registration update
+
+Email/password and Discord now both work with the same driver database. Follow **YOUR-FRA-SETUP.md** to upload the update and disable Supabase **Confirm email** for immediate registration. No new build variables are needed.

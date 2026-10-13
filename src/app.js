@@ -36,7 +36,10 @@ let cleanCar = () => {},
   },
   driverSearch = "",
   driverSort = "name",
-  adminPreview = false;
+  adminPreview = false,
+  authMode = "login",
+  authEmail = "",
+  authNotice = "";
 const $ = (s) => document.querySelector(s),
   app = $("#app"),
   modal = $("#modal");
@@ -113,7 +116,7 @@ function chrome(page) {
       )
       .join(
         "",
-      )}</nav><div class="nav-actions">${canAdmin() ? '<a class="text-button" href="#admin">Race control ↗</a>' : ""}<a class="text-button" href="#account">${backend.identity.user ? "My profile" : "Register with Discord"}</a><a class="button" href="#submit">SUBMIT A LAP ${arrow}</a><button class="menu-button" data-action="menu" aria-label="Toggle navigation" aria-expanded="false">☰</button></div>`;
+      )}</nav><div class="nav-actions">${canAdmin() ? '<a class="text-button" href="#admin">Race control ↗</a>' : ""}<a class="text-button" href="#account">${backend.identity.user ? "My profile" : "Register / Log in"}</a><a class="button" href="#submit">SUBMIT A LAP ${arrow}</a><button class="menu-button" data-action="menu" aria-label="Toggle navigation" aria-expanded="false">☰</button></div>`;
   $("#footer").innerHTML =
     `<div class="footer-top"><a class="brand" href="#home"><img src="assets/fra-logo.png" alt="FRA"><span>FORTNITE RACING<br>ASSOCIATION</span></a><div class="footer-links"><a href="#events">Events</a><a href="#time-trials">Time trials</a><a href="#tracks">Tracks</a><a href="#drivers">Drivers</a><a href="#admin">Admin login ↗</a></div></div><div class="footer-bottom"><span>© 2026 Fortnite Racing Association. An independent community.<br>Not affiliated with or endorsed by Epic Games.</span><span>${demo ? "DESIGN PREVIEW" : "THE FRA PADDOCK"}<br>BUILT FOR THE LOVE OF RACING.</span></div>`;
 }
@@ -720,14 +723,16 @@ function countryField(value = "") {
 }
 function accountPage(message = "") {
   const d = currentDriver();
-  if (!backend.identity.user)
-    return `<section class="page">${pageHeading("YOUR PLACE ON THE GRID", "JOIN THE FRA PADDOCK.", message || "One driver profile. Every event. Every lap.")}<div class="form-panel account-signin"><img src="assets/fra-logo.png" alt="FRA" width="95"><h3>REGISTER WITH DISCORD.</h3><p class="body-copy">Connect your Discord account, then choose your driver name, country and profile images.</p><button class="button" data-action="discord" ${!live ? "disabled" : ""}>REGISTER / SIGN IN WITH DISCORD ↗</button>${!live ? `<p class="helper">${demo ? "Discord sign-in is unavailable in this design preview." : "Driver registration is opening soon."}</p>` : ""}<p id="account-error" class="error" role="alert"></p></div></section>`;
+  if (!backend.identity.user) {
+    const registering = authMode === "register";
+    return `<section class="page">${pageHeading("YOUR PLACE ON THE GRID", "JOIN THE FRA PADDOCK.", message || "One driver profile. Every event. Every lap.")}<div class="form-panel account-signin"><img src="assets/fra-logo.png" alt="FRA" width="80"><h3>${registering ? "CREATE YOUR ACCOUNT." : "WELCOME TO THE PADDOCK."}</h3><p class="body-copy">${registering ? "Create an account with your email and password, then choose your driver name and country." : "Sign in with your email and password or continue with Discord."}</p><div class="auth-switch" role="group" aria-label="Account action"><button type="button" data-action="auth-mode" data-mode="login" aria-pressed="${!registering}" class="${!registering ? "selected" : ""}">SIGN IN</button><button type="button" data-action="auth-mode" data-mode="register" aria-pressed="${registering}" class="${registering ? "selected" : ""}">CREATE ACCOUNT</button></div><form id="email-auth-form" data-mode="${authMode}" class="auth-form">${field("email", "EMAIL ADDRESS", authEmail, "email", true, 'autocomplete="email" maxlength="254" autocapitalize="none" spellcheck="false"')}${field("password", "PASSWORD", "", "password", true, registering ? 'autocomplete="new-password" minlength="8" maxlength="128"' : 'autocomplete="current-password"')}${registering ? '<small class="muted">At least 8 characters.</small>' : ""}<p id="account-error" class="error" role="alert"></p><p class="auth-notice" role="status">${e(authNotice)}</p><button class="button" type="submit" ${!live ? "disabled" : ""}>${registering ? "CREATE ACCOUNT" : "SIGN IN"} ↗</button></form><div class="auth-divider"><span>OR</span></div><button class="outline auth-discord" data-action="discord" ${!live ? "disabled" : ""}>CONTINUE WITH DISCORD ↗</button>${!live ? `<p class="helper">${demo ? "Account sign-in is unavailable in this design preview." : "Driver registration is opening soon."}</p>` : ""}</div></section>`;
+  }
   if (!d)
     return statusPage(
       "YOUR DRIVER PROFILE IS NOT READY.",
       "Please contact FRA race control.",
     );
-  return `<section class="page">${pageHeading("YOUR DRIVER PROFILE", d.complete ? "WELCOME BACK, " + e(d.name).toUpperCase() + "." : "TAKE YOUR PLACE.", message || "Make the grid your own. Your Discord account keeps your profile connected.", '<button class="outline" data-action="signout">SIGN OUT ↗</button>')}${d.active ? "" : '<div class="notice">Your driver account is inactive. Contact race control to enter events or submit laps.</div>'}<div class="form-layout"><form id="profile-form" class="form-panel"><h3>${d.complete ? "EDIT YOUR PROFILE" : "COMPLETE REGISTRATION"}</h3><div class="form-grid">${field("name", "DRIVER NAME", d.complete ? d.name : "", "text", true, 'minlength="3" maxlength="32" autocomplete="nickname"')}${countryField(d.country)}${field("number", "RACE NUMBER · OPTIONAL", d.number, "text", false, 'pattern="[0-9]{0,3}" maxlength="3"')}<div class="field"><label for="profile-avatar">PROFILE PICTURE</label><input id="profile-avatar" name="avatarFile" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG or WebP · up to 5 MB. Your Discord picture is used by default.</small></div><div class="field full"><label for="profile-banner">BANNER · OPTIONAL</label><input id="profile-banner" name="bannerFile" type="file" accept="image/png,image/jpeg,image/webp"><small>A wide image works best · up to 5 MB.</small>${d.banner ? '<label class="checks"><input type="checkbox" name="removeBanner"> Remove current banner</label>' : ""}</div><div class="field full"><label for="profile-bio">BIO · OPTIONAL</label><textarea id="profile-bio" name="bio" maxlength="500">${e(d.bio)}</textarea></div><p id="profile-error" class="error full" role="alert"></p><button class="button full" type="submit">${d.complete ? "SAVE PROFILE" : "FINISH REGISTRATION"} ↗</button></div></form><aside><div class="form-panel">${d.banner ? `<img class="profile-banner" src="${e(safeURL(d.banner))}" alt="Your profile banner">` : ""}<div class="profile-hero">${avatar(d)}<div><h3>${e(d.complete ? d.name : "YOUR DRIVER NAME")}</h3><p>${e(d.flag)} ${e(d.country)}</p></div></div><button class="outline" data-action="profile" data-id="${e(d.id)}">VIEW DRIVER PROFILE ↗</button></div><div class="rule"><b>01</b><div><strong>Your events</strong>${
+  return `<section class="page">${pageHeading("YOUR DRIVER PROFILE", d.complete ? "WELCOME BACK, " + e(d.name).toUpperCase() + "." : "TAKE YOUR PLACE.", message || "Make the grid your own. Your account keeps your events and lap times together.", '<button class="outline" data-action="signout">SIGN OUT ↗</button>')}${d.active ? "" : '<div class="notice">Your driver account is inactive. Contact race control to enter events or submit laps.</div>'}<div class="form-layout"><form id="profile-form" class="form-panel"><h3>${d.complete ? "EDIT YOUR PROFILE" : "COMPLETE REGISTRATION"}</h3><div class="form-grid">${field("name", "DRIVER NAME", d.complete ? d.name : "", "text", true, 'minlength="3" maxlength="32" autocomplete="nickname"')}${countryField(d.country)}${field("number", "RACE NUMBER · OPTIONAL", d.number, "text", false, 'pattern="[0-9]{0,3}" maxlength="3"')}<div class="field"><label for="profile-avatar">PROFILE PICTURE</label><input id="profile-avatar" name="avatarFile" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG or WebP · up to 5 MB. A Discord picture is used when available.</small></div><div class="field full"><label for="profile-banner">BANNER · OPTIONAL</label><input id="profile-banner" name="bannerFile" type="file" accept="image/png,image/jpeg,image/webp"><small>A wide image works best · up to 5 MB.</small>${d.banner ? '<label class="checks"><input type="checkbox" name="removeBanner"> Remove current banner</label>' : ""}</div><div class="field full"><label for="profile-bio">BIO · OPTIONAL</label><textarea id="profile-bio" name="bio" maxlength="500">${e(d.bio)}</textarea></div><p id="profile-error" class="error full" role="alert"></p><button class="button full" type="submit">${d.complete ? "SAVE PROFILE" : "FINISH REGISTRATION"} ↗</button></div></form><aside><div class="form-panel">${d.banner ? `<img class="profile-banner" src="${e(safeURL(d.banner))}" alt="Your profile banner">` : ""}<div class="profile-hero">${avatar(d)}<div><h3>${e(d.complete ? d.name : "YOUR DRIVER NAME")}</h3><p>${e(d.flag)} ${e(d.country)}</p></div></div><button class="outline" data-action="profile" data-id="${e(d.id)}">VIEW DRIVER PROFILE ↗</button></div>${backend.identity.user.email ? `<form id="password-form" class="form-panel password-settings"><h3>EMAIL SIGN-IN</h3><p class="helper">${e(backend.identity.user.email)}</p><p class="body-copy">Set or update a password to sign in with this email.</p>${field("newPassword", "NEW PASSWORD", "", "password", true, 'autocomplete="new-password" minlength="8" maxlength="128"')}<small class="muted">At least 8 characters.</small><p id="password-error" class="error" role="alert"></p><button class="outline" type="submit">SAVE PASSWORD ↗</button></form>` : ""}<div class="rule"><b>01</b><div><strong>Your events</strong>${
     db.events
       .filter((v) =>
         (db.registrations || []).some(
@@ -942,6 +947,15 @@ document.addEventListener("click", async (ev) => {
     render();
     return refresh();
   }
+  if (a === "auth-mode") {
+    if (writeBusy) return;
+    authEmail = $("#f-email")?.value || authEmail;
+    authMode = b.dataset.mode === "register" ? "register" : "login";
+    authNotice = "";
+    render();
+    $("#f-email")?.focus();
+    return;
+  }
   if (a === "discord")
     return writeAction(b, () => backend.signIn(), "#account-error");
   if (a === "signout")
@@ -1015,7 +1029,9 @@ document.addEventListener("click", async (ev) => {
     if (a.startsWith("edit-")) return editor(a.slice(5), id);
     if (["add-driver", "add-track", "add-event", "add-creator"].includes(a)) {
       if (!demo && a === "add-driver")
-        throw Error("Drivers register using Discord.");
+        throw Error(
+          "Drivers register through the website using email or Discord.",
+        );
       return editor(a.slice(4), null, id);
     }
     if (a.startsWith("delete-")) return deletion(a.slice(7), id);
@@ -1069,6 +1085,8 @@ document.addEventListener("submit", (ev) => {
     errorSelector = {
       "lap-form": "#lap-error",
       "profile-form": "#profile-error",
+      "email-auth-form": "#account-error",
+      "password-form": "#password-error",
       "edit-form": "#edit-error",
       "reject-form": "#reject-error",
     }[f.id];
@@ -1077,10 +1095,39 @@ document.addEventListener("submit", (ev) => {
   writeAction(
     f.querySelector('[type="submit"]'),
     async () => {
+      if (f.id === "email-auth-form") {
+        authEmail = v.email.trim();
+        authNotice = "";
+        const registering = f.dataset.mode === "register";
+        const result = registering
+          ? await backend.registerWithEmail(authEmail, v.password)
+          : await backend.signInWithEmail(authEmail, v.password);
+        f.reset();
+        if (registering && !result.session) {
+          authNotice =
+            "Your account is awaiting email confirmation. Contact FRA race control to finish signing in.";
+          render();
+          return;
+        }
+        authEmail = "";
+        await refresh();
+        toast(
+          registering
+            ? "Account created. Complete your driver profile."
+            : "Welcome back.",
+        );
+        return;
+      }
+      if (f.id === "password-form") {
+        await backend.setPassword(v.newPassword);
+        f.reset();
+        toast("Password saved. You can now sign in with your email.");
+        return;
+      }
       if (f.id === "profile-form") {
         const d = currentDriver(),
           country = findCountry(v.country);
-        if (!d) throw Error("Sign in with Discord first.");
+        if (!d) throw Error("Sign in first.");
         if (!country) throw Error("Choose a country from the list.");
         const p = {
           ...d,
@@ -1222,14 +1269,12 @@ document.addEventListener("submit", (ev) => {
           o.timezone = "America/Toronto";
           o.registrationOpen = v.registrationOpen === "yes";
           if (!track(o.track)) throw Error("Choose an existing track.");
-          o.results = fd
-            .getAll("resultDriver")
-            .map((d, i) => ({
-              driver: d,
-              position: Number(fd.getAll("resultPos")[i]),
-              time: fd.getAll("resultTime")[i].trim(),
-              qualifying: fd.getAll("resultQuali")[i].trim(),
-            }));
+          o.results = fd.getAll("resultDriver").map((d, i) => ({
+            driver: d,
+            position: Number(fd.getAll("resultPos")[i]),
+            time: fd.getAll("resultTime")[i].trim(),
+            qualifying: fd.getAll("resultQuali")[i].trim(),
+          }));
           if (
             o.results.some(
               (r) =>

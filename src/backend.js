@@ -95,6 +95,24 @@ export async function signIn() {
     }),
   );
 }
+export async function signInWithEmail(email, password) {
+  if (!client) throw Error("Account sign-in is unavailable right now.");
+  return check(
+    await client.auth.signInWithPassword({ email: email.trim(), password }),
+  );
+}
+export async function registerWithEmail(email, password) {
+  if (!client) throw Error("Account registration is unavailable right now.");
+  if (password.length < 8)
+    throw Error("Choose a password with at least 8 characters.");
+  return check(await client.auth.signUp({ email: email.trim(), password }));
+}
+export async function setPassword(password) {
+  if (!client || !identity.user) throw Error("Sign in first.");
+  if (password.length < 8)
+    throw Error("Choose a password with at least 8 characters.");
+  check(await client.auth.updateUser({ password }));
+}
 export async function signOut() {
   if (client) check(await client.auth.signOut());
   identity.user = null;
@@ -281,18 +299,16 @@ export async function reviewLap(id, status, note = "") {
 }
 export async function submitLap(l) {
   check(
-    await client
-      .from("laps")
-      .insert({
-        driver_id: identity.user.id,
-        track_id: l.track,
-        weather: l.weather,
-        car_class: l.car,
-        custom_car: l.custom,
-        tire_compound: l.tire || null,
-        lap_ms: l.ms,
-        proof_url: l.proof,
-      }),
+    await client.from("laps").insert({
+      driver_id: identity.user.id,
+      track_id: l.track,
+      weather: l.weather,
+      car_class: l.car,
+      custom_car: l.custom,
+      tire_compound: l.tire || null,
+      lap_ms: l.ms,
+      proof_url: l.proof,
+    }),
   );
 }
 export async function registerEvent(id, cancel = false) {
