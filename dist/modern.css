@@ -2562,6 +2562,11 @@ dialog.profile-dialog {
 .track-mini {
   border-radius: 18px;
 }
+.track-expand {
+  display: flex;
+  justify-content: center;
+  margin-top: 22px;
+}
 .track-mini .track-visual {
   display: block;
   height: 116px;

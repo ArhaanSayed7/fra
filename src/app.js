@@ -50,6 +50,7 @@ const $ = (s) => document.querySelector(s),
   app = $("#app"),
   modal = $("#modal");
 const arrow = '<span class="arrow" aria-hidden="true">↗</span>';
+const expandedCreators = new Set();
 const track = (id) => db.tracks.find((t) => t.id === id),
   driver = (id) => db.drivers.find((d) => d.id === id),
   creator = (id) => db.creators.find((c) => c.id === id);
@@ -369,15 +370,17 @@ function creatorAvatar(c) {
 function trackDirectory() {
   return (
     db.creators
-      .map(
-        (c) =>
-          `<div class="creator-header"><div class="creator-title">${creatorAvatar(c)}<div><h3>${e(c.name)}</h3><p>${e(c.description)}</p></div></div>${adminPreview ? `<button class="outline" data-action="add-track" data-id="${e(c.id)}">+ ADD TRACK</button>` : ""}</div><div class="track-grid">${
-            db.tracks
-              .filter((t) => t.creator === c.id)
+      .map((c, index) => {
+        const tracks = db.tracks.filter((t) => t.creator === c.id),
+          expanded = expandedCreators.has(c.id),
+          gridId = `creator-tracks-${index}`;
+        return `<section class="creator-tracks"><div class="creator-header"><div class="creator-title">${creatorAvatar(c)}<div><h3>${e(c.name)}</h3><p>${e(c.description)}</p></div></div>${adminPreview ? `<button class="outline" data-action="add-track" data-id="${e(c.id)}">+ ADD TRACK</button>` : ""}</div><div class="track-grid" id="${gridId}">${
+            tracks
+              .slice(0, expanded ? tracks.length : 4)
               .map(trackCard)
               .join("") || '<div class="empty">No tracks yet.</div>'
-          }</div>`,
-      )
+          }</div>${tracks.length > 4 ? `<div class="track-expand"><button class="outline" data-action="toggle-creator-tracks" data-id="${e(c.id)}" aria-controls="${gridId}" aria-expanded="${expanded}">${expanded ? "Show less" : `Show more (${tracks.length - 4})`}</button></div>` : ""}</section>`;
+      })
       .join("") ||
     '<div class="empty">The circuit directory is on its way.</div>'
   );
@@ -1140,6 +1143,19 @@ document.addEventListener("click", async (ev) => {
   const a = b.dataset.action,
     id = b.dataset.id;
   if (a === "close") return closeModal();
+  if (a === "toggle-creator-tracks") {
+    const expanded = !expandedCreators.has(id),
+      tracks = db.tracks.filter((t) => t.creator === id);
+    if (expanded) expandedCreators.add(id);
+    else expandedCreators.delete(id);
+    b.closest(".creator-tracks").querySelector(".track-grid").innerHTML = tracks
+      .slice(0, expanded ? tracks.length : 4)
+      .map(trackCard)
+      .join("");
+    b.setAttribute("aria-expanded", String(expanded));
+    b.textContent = expanded ? "Show less" : `Show more (${tracks.length - 4})`;
+    return;
+  }
   if (a === "menu") {
     const open = $(".nav").classList.toggle("open");
     b.setAttribute("aria-expanded", open);
