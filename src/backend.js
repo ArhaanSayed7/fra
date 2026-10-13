@@ -14,7 +14,7 @@ export const client =
         },
       })
     : null;
-export const identity = { user: null, admin: false };
+export const identity = { user: null, admin: false, developer: false };
 export const emptyDatabase = () => ({
   version: 1,
   creators: [],
@@ -25,6 +25,7 @@ export const emptyDatabase = () => ({
   registrations: [],
   statistics: [],
   history: [],
+  roles: [],
 });
 function check(result) {
   if (result.error) throw result.error;
@@ -68,7 +69,11 @@ export async function initialize() {
   if (identity.user) {
     identity.user = check(await client.auth.getUser()).user;
     identity.admin = check(await client.rpc("is_admin")) === true;
-  } else identity.admin = false;
+    identity.developer = check(await client.rpc("is_developer")) === true;
+  } else {
+    identity.admin = false;
+    identity.developer = false;
+  }
 }
 export function watchAuth(callback) {
   if (client)
@@ -117,6 +122,7 @@ export async function signOut() {
   if (client) check(await client.auth.signOut());
   identity.user = null;
   identity.admin = false;
+  identity.developer = false;
 }
 export async function loadRemote() {
   const names = [
@@ -143,8 +149,10 @@ export async function loadRemote() {
     eventHistory,
     records,
   ] = await Promise.all(names.map(rows));
+  const roles = check(await client.rpc("driver_roles"));
   return {
     version: 1,
+    roles,
     creators,
     tracks: tracks.map((t) => ({
       id: t.id,
@@ -357,5 +365,15 @@ export async function saveProfile(p) {
       .eq("id", identity.user.id)
       .select("id")
       .single(),
+  );
+}
+
+export async function setDriverAdmin(driverId, enabled) {
+  if (!client || !identity.developer) throw Error("Developer access required.");
+  check(
+    await client.rpc("set_driver_admin", {
+      p_driver_id: driverId,
+      p_enabled: enabled,
+    }),
   );
 }

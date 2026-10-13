@@ -1,23 +1,45 @@
-# FRA: email and Discord registration
+# FRA modern redesign update
 
-The website is live at https://fra-hub.pages.dev/. Discord login and Rivers' administrator access are already connected. All three included database migrations, including email driver registration, have been applied to the FRA project. Do not run them again.
+The existing website is https://fra-hub.pages.dev/. Email/password and Discord registration already work. All four database migrations have been applied to the FRA project, and Rivers has protected Developer ownership. No database queries, new environment variables or Discord changes are needed for this update.
 
-## Install this update
+## Upload the update
 
-1. Extract `fra-email-registration-update.zip`.
-2. Upload its contents into the existing **ArhaanSayed7/fra** GitHub repository, preserving the `src`, `dist`, `supabase` and `tests` folders. Replace the matching files and commit. Do not upload the ZIP itself. Cloudflare Pages builds and deploys the commit automatically.
-3. Open [FRA Authentication providers](https://supabase.com/dashboard/project/jvarfwhhfpytpskghuky/auth/providers). Keep **Email** and **Discord** enabled. Switch **Confirm email** off and save. Keep new-user signups enabled.
-4. Wait for the Cloudflare deployment to finish, then open the website's **Register / Log in** page. **Create account** asks for an email and a password of at least eight characters. The driver is signed in immediately and chooses their driver name and country on the profile page.
+1. Extract **fra-modern-redesign-update.zip**.
+2. Open the extracted folder in Finder. Select the files and folders **inside it**, then drag them together onto GitHub’s **Add file → Upload files** page in **ArhaanSayed7/fra**. Preserve the nested `src`, `dist`, `licenses`, `supabase` and `tests` folders; do not flatten them or upload the ZIP itself.
+3. Commit the replacements to **main**. Cloudflare Pages automatically builds and deploys the commit.
+4. Wait for a successful deployment, then refresh the FRA website. If the old appearance remains, refresh without cache (**⌘⇧R** in Chrome).
 
-No new Cloudflare environment variables, Discord application changes, SMTP service or database queries are needed. Supabase's Confirm email setting was still on when this package was prepared; immediate signup requires step 3.
+The update ZIP has files at its root. `package.json` already in your repository stays at the root. The full website ZIP is also available for a complete fresh copy; upload the contents of its inner `fortnite-racing-association` folder.
 
-## Existing drivers
+## New look and navigation
 
-Drivers can sign in with **Email/password** or **Continue with Discord**. An existing Discord driver can open **My profile → Email sign-in** while signed in and save a password for the email shown there. They can then sign in with that email/password to the same driver profile, with the same history and permissions. They should use this option instead of creating another account. The email appears only in their own account settings, not their public driver profile.
+True black pages, locally hosted Manrope fonts, yellow-to-orange gradients, rounded panels, cleaner tables and dropdowns, button hover highlights, and a cursor-local liquid highlight on **FIND YOUR LIMIT**. The Prevalent model remains interactive. Reduced-motion preferences and the motion pause control are respected.
 
-## Existing Cloudflare settings
+**REGISTER NOW** opens account creation for unregistered visitors. Registered drivers see **MY PROFILE**, which opens their editable account. **Submit Lap** sits immediately to its left. **Admin Panel** replaces Race control, with its link in the header or mobile menu for authorized users.
 
-Build command: `npm run build`. Output directory: `dist`. Repository root: blank. Keep these existing Production build variables:
+The driver directory uses compact list rows with avatars, badges and statistics. Profile popups have a shorter, wider banner with a rounded outer frame; the image uses a landscape crop on desktop and adapts on mobile. The track directory shows compact cards with small image headers, map codes, release dates, supported setups and lap-record times. Full information is available under View track. Your existing pictures, banner, country, profile information and racing data are preserved.
+
+## Give another driver admin access
+
+1. Sign in as **Rivers** and refresh the page after deployment.
+2. Open **Admin Panel → Access**.
+3. Find an active registered driver and click **MAKE ADMIN**. Their profile gains the Admin badge. Use **REMOVE ADMIN** to revoke access.
+
+Only Rivers’ protected Developer role can use these controls. Admins can manage racing content and driver profiles but cannot appoint admins or assign Developer ownership. Inactive drivers must be activated in the **Drivers** tab first. Discord server roles and website admin roles are separate.
+
+## Badges
+
+- **Developer**: Rivers’ protected website ownership.
+- **Admin**: registered drivers granted website admin access.
+- **Event Winner**: at least one race win in a completed event.
+- **Event Pole**: fastest valid qualifying lap in a completed event; equal times use a stable driver-ID tie break.
+- **Lap Record**: currently holds at least one approved overall track record. Pending laps do not count. Losing every record removes the badge.
+
+These achievement badges come from actual event results and approved laps. Admins maintain those results and approve lap proof as before.
+
+## Existing hosting settings
+
+Build command **npm run build**, output **dist**, root directory blank. Keep the existing Production build variables:
 
 ```text
 NODE_VERSION=22
@@ -26,14 +48,10 @@ PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_nJYrdAem-_vTeHQ5BuQtcQ_x_cWQsQV
 PUBLIC_DEMO_MODE=false
 ```
 
-These are public website settings. Do not add a Supabase secret/service-role key, Discord Client Secret or Bot Token to the website repository.
+The database migration in the ZIP is a reference for fresh installations. It is already applied to your FRA project; do not run it again. Your working login and redirect settings stay the same.
 
-Supabase Site URL and exact allowed Redirect URL stay `https://fra-hub.pages.dev/`. Discord's OAuth redirect stays `https://jvarfwhhfpytpskghuky.supabase.co/auth/v1/callback`. Keep `http://localhost:4174/` allowed if testing locally.
+## Verification
 
-## What was checked
+All 19 automated checks pass, including driver permissions, developer-only admin grants/revocation, protected ownership, achievement rules, email authentication, event results, lap moderation and media ownership. The production build succeeds. Desktop and 390px mobile previews were inspected, including profile/history dialogs, compact driver lists and track cards, country search, keyboard dropdown selection, event session toggles and admin controls. Leaderboard filters use only the selected track’s available weather, cars and tires; fixed single choices and unavailable tire controls are hidden. Switching tracks clears incompatible old selections. Automated tests cover these transitions. Admin grant/revoke browser checks used an isolated local fixture, without changing real drivers’ permissions. Rivers’ live Developer role was verified separately.
 
-All 13 automated website checks pass, covering the real Supabase SDK with simulated signup/login responses, email driver creation/backfill, ownership, admin permissions, event entries/results, lap moderation and image ownership. The production build succeeds. The new login and registration forms were inspected on desktop and mobile with no browser errors. The live database supports email profiles without giving new users admin access.
-
-No production email test account was created. A live signup check remains after turning off Confirm email and deploying the files. Test account creation, profile completion, sign-out and sign-in. No password-reset email flow is included in this simple version.
-
-See **SETUP.md** for a fresh installation and troubleshooting.
+After uploading, confirm the new appearance, your Developer badge and the Access tab on the live site. No real event results or lap submissions were added during testing.

@@ -12,6 +12,9 @@ import {
 import { countries, findCountry, flag } from "./countries.js";
 import * as backend from "./backend.js";
 import { carScene } from "./car.js";
+import { enhanceControls, titleMotion } from "./ui.js";
+import { leaderboardSetup } from "./leaderboard-filters.js";
+import { achievements, roleFor } from "./driver-badges.js";
 const demo = backend.demo,
   live = !!backend.client;
 let db = demo ? load() : backend.emptyDatabase(),
@@ -23,7 +26,8 @@ let db = demo ? load() : backend.emptyDatabase(),
 const canAdmin = () => demo || backend.identity.admin;
 const currentDriver = () =>
   db.drivers.find((d) => d.id === backend.identity.user?.id);
-let cleanCar = () => {},
+let cleanTitle = () => {},
+  cleanCar = () => {},
   adminTab = "overview",
   session = {},
   boardFilters = {
@@ -53,7 +57,7 @@ const avatar = (d) =>
     : `<span class="avatar">${e((d?.name || "?").slice(0, 2).toUpperCase())}</span>`;
 const driverCell = (d) =>
   d
-    ? `<button class="driver-name driver-link" data-action="profile" data-id="${e(d.id)}">${avatar(d)}<span>${e(d.name)}</span></button>`
+    ? `<button class="driver-name driver-link" data-action="profile" data-id="${e(d.id)}">${avatar(d)}<span>${e(d.name)}${badges(d.id, true)}</span></button>`
     : "Removed driver";
 const options = (items, selected = "", empty = "") =>
   `${empty ? `<option value="">${e(empty)}</option>` : ""}${items
@@ -88,10 +92,14 @@ function commit() {
     return false;
   }
 }
-function showModal(title, body) {
+function showModal(title, body, className = "") {
   if (modal.open) modal.close();
-  modal.innerHTML = `<div class="modal-head"><h3>${e(title)}</h3><button class="close" data-action="close" aria-label="Close dialog">×</button></div>${body}`;
+  modal.className = className;
+  modal.setAttribute("aria-labelledby", "dialog-title");
+  modal.innerHTML = `<div class="modal-head"><h3 id="dialog-title">${e(title)}</h3><button class="close" data-action="close" aria-label="Close dialog">×</button></div>${body}`;
+  modal.scrollTop = 0;
   modal.showModal();
+  enhanceControls(modal);
 }
 function closeModal() {
   modal.close();
@@ -101,24 +109,24 @@ modal.addEventListener("click", (ev) => {
   if (ev.target === modal) closeModal();
 });
 function chrome(page) {
+  const registered = currentDriver()?.complete === true;
   $("#header").innerHTML =
     `<a class="brand" href="#home" aria-label="Fortnite Racing Association home"><img src="assets/fra-logo.png" alt="FRA"><span>FORTNITE RACING<br>ASSOCIATION</span></a><nav class="nav" aria-label="Main navigation">${[
-      ["home", "Paddock"],
+      ["home", "Home"],
       ["events", "Events"],
       ["time-trials", "Time trials"],
       ["tracks", "Tracks"],
       ["drivers", "Drivers"],
-      ["history", "Event history"],
     ]
       .map(
         ([id, name]) =>
-          `<a class="${page === id || (page === "track" && id === "tracks") ? "active" : ""}" href="#${id}">${name}</a>`,
+          `<a class="${page === id || (page === "track" && id === "tracks") || (page === "event" && id === "events") || (page === "history" && id === "events") ? "active" : ""}" href="#${id}">${name}</a>`,
       )
       .join(
         "",
-      )}</nav><div class="nav-actions">${canAdmin() ? '<a class="text-button" href="#admin">Race control ↗</a>' : ""}<a class="text-button" href="#account">${backend.identity.user ? "My profile" : "Register / Log in"}</a><a class="button" href="#submit">SUBMIT A LAP ${arrow}</a><button class="menu-button" data-action="menu" aria-label="Toggle navigation" aria-expanded="false">☰</button></div>`;
+      )}${canAdmin() ? '<a class="mobile-admin" href="#admin">Admin Panel ↗</a>' : ""}</nav><div class="nav-actions">${canAdmin() ? '<a class="text-button admin-link" href="#admin">Admin Panel</a>' : ""}<a class="text-button submit-link" href="#submit">Submit Lap</a><a class="button nav-primary" href="#account" ${!registered ? 'data-action="register"' : ""}>${registered ? "MY PROFILE" : "REGISTER NOW"} ${arrow}</a><button class="menu-button" data-action="menu" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span></button></div>`;
   $("#footer").innerHTML =
-    `<div class="footer-top"><a class="brand" href="#home"><img src="assets/fra-logo.png" alt="FRA"><span>FORTNITE RACING<br>ASSOCIATION</span></a><div class="footer-links"><a href="#events">Events</a><a href="#time-trials">Time trials</a><a href="#tracks">Tracks</a><a href="#drivers">Drivers</a><a href="#admin">Admin login ↗</a></div></div><div class="footer-bottom"><span>© 2026 Fortnite Racing Association. An independent community.<br>Not affiliated with or endorsed by Epic Games.</span><span>${demo ? "DESIGN PREVIEW" : "THE FRA PADDOCK"}<br>BUILT FOR THE LOVE OF RACING.</span></div>`;
+    `<div class="footer-top"><a class="brand" href="#home"><img src="assets/fra-logo.png" alt="FRA"><span>FORTNITE RACING<br>ASSOCIATION</span></a><div class="footer-links"><a href="#events">Events</a><a href="#time-trials">Time trials</a><a href="#tracks">Tracks</a><a href="#drivers">Drivers</a><a href="#history">Event history</a><a href="#admin">Admin Panel ↗</a></div></div><div class="footer-bottom"><span>© 2026 Fortnite Racing Association.<br>Independent community. Not affiliated with Epic Games.</span><span>COMMUNITY BUILT.<br>RACE READY.</span></div>`;
 }
 function eventCard(ev) {
   let t = track(ev.track),
@@ -137,7 +145,7 @@ function home() {
     )
     .sort((a, b) => a.ms - b.ms)
     .slice(0, 3);
-  return `<section class="hero"><div class="hero-top"><span class="tiny"><i class="live-dot"></i>THE HOME OF COMMUNITY RACING</span><span class="tiny muted">FORTNITE. FULL THROTTLE.</span></div><h1>FIND YOUR <span>LIMIT.</span></h1><div class="orbit"></div><div class="car-stage" aria-label="Interactive 3D Prevalent car. Move your pointer or drag to rotate."><div class="load-state tiny">LOADING THE PREVALENT…</div></div><span class="hero-side">PRECISION / PASSION / PURE RACING</span><span class="hero-side right">PREVALENT · FRA SPEC / 001</span><div class="hero-bottom"><div class="hero-copy"><p>Every corner is a challenge. Every second counts.<br>Your next great race starts here.</p><div class="hero-controls"><a class="button" href="#events">EXPLORE EVENTS ${arrow}</a><a class="text-button" href="#time-trials">TIME TRIALS ↗</a></div></div><div class="scroll-cue"><span>↓</span>SCROLL TO THE GRID</div><div><div class="spec"><div><span class="tiny muted">THE MACHINE</span><strong>PREVALENT</strong></div><div><span class="tiny muted">THE MINDSET</span><strong>NO LIMITS.</strong></div></div><div class="hero-controls"><button id="motion" aria-pressed="false">Ⅱ Pause motion</button><span class="tiny muted" style="font-size:8px">DRAG TO EXPLORE ↔</span></div></div></div></section><div class="ticker" aria-hidden="true"><div class="ticker-inner">${Array.from({ length: 4 }, () => "<span>RACE TOGETHER</span><b>✦</b><span>CHASE THE CLOCK</span><b>✦</b><span>FIND YOUR LIMIT</span><b>✦</b>").join("")}</div></div><section class="section"><div class="section-head"><div><div class="eyebrow">THE RACE CALENDAR</div><h2>NEXT ON THE GRID.</h2></div><a class="text-button" href="#events">ALL EVENTS ${arrow}</a></div><div class="event-grid">${
+  return `<section class="hero"><div class="hero-top"><span class="hero-pill"><i class="live-dot"></i>COMMUNITY BUILT. RACE READY.</span><span class="tiny muted">FORTNITE RACING ASSOCIATION</span></div><svg class="effect-defs" aria-hidden="true"><defs><filter id="liquid-ink"><feTurbulence type="fractalNoise" baseFrequency=".024 .055" numOctaves="2" seed="7" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="13" xChannelSelector="R" yChannelSelector="G"/></filter></defs></svg><h1 class="hero-title"><span class="title-line">FIND YOUR</span><span class="title-line accent">LIMIT.</span><span class="ink-layer" aria-hidden="true"><span>FIND YOUR</span><span>LIMIT.</span></span></h1><div class="hero-aura" aria-hidden="true"></div><div class="orbit" aria-hidden="true"></div><div class="car-stage" aria-label="Interactive 3D Prevalent car. Move your pointer or drag to rotate."><div class="load-state tiny">LOADING THE PREVALENT…</div></div><div class="hero-bottom"><div class="hero-copy"><p>A better line. A faster lap. Your next great race.<br> Welcome to the home of Fortnite racing.</p><div class="hero-controls"><a class="button" href="#events">EXPLORE EVENTS ${arrow}</a><a class="text-button" href="#time-trials">Time trials ${arrow}</a></div></div><div class="hero-status"><span class="tiny muted">YOUR GRID IS WAITING</span><div><strong>${db.drivers.filter((d) => d.complete !== false).length}<small>Drivers</small></strong><strong>${db.tracks.length}<small>Circuits</small></strong></div><button id="motion" class="motion-control" aria-pressed="false">Ⅱ Pause motion</button></div></div></section><div class="ticker" aria-hidden="true"><div class="ticker-inner">${Array.from({ length: 4 }, () => "<span>RACE TOGETHER</span><b>✦</b><span>CHASE THE CLOCK</span><b>✦</b><span>FIND YOUR LIMIT</span><b>✦</b>").join("")}</div></div><section class="section"><div class="section-head"><div><div class="eyebrow">THE RACE CALENDAR</div><h2>NEXT ON THE GRID.</h2></div><a class="text-button" href="#events">ALL EVENTS ${arrow}</a></div><div class="event-grid">${
     db.events
       .filter((x) => x.status === "upcoming")
       .slice(0, 3)
@@ -167,11 +175,43 @@ function eventPage(id) {
     mode = session[id] || "race";
   let results = [...(ev.results || [])].sort((a, b) => a.position - b.position);
   if (mode === "qualifying")
-    results.sort((a, b) => parseLap(a.qualifying) - parseLap(b.qualifying));
+    results.sort(
+      (a, b) =>
+        parseLap(a.qualifying) - parseLap(b.qualifying) ||
+        a.driver.localeCompare(b.driver),
+    );
   return `<section class="page">${pageHeading("ROUND " + e(ev.round), e(ev.name), e(ev.description), '<a class="text-button" href="#events">← BACK TO EVENTS</a>')}${notice()}<div class="event-detail"><img src="${image(t)}" alt="${e(t?.name)} concept circuit"><div><span class="tag">${ev.status === "past" ? "COMPLETED" : "UPCOMING"}</span><h3 style="margin-top:25px"><a href="#track/${e(t?.id)}">${e(t?.name)} ↗</a></h3><div class="session-toggle">${["qualifying", "race"].map((s) => `<button data-action="session" data-id="${e(id)}" data-mode="${s}" class="${mode === s ? "selected" : ""}" aria-pressed="${mode === s}">${s === "race" ? "Race" : "Qualifying"}</button>`).join("")}</div><div class="detail-list"><div><span>DATE</span><strong>${date(ev.date)}</strong></div><div><span>${mode === "race" ? "LIGHTS OUT" : "SESSION START"}</span><strong>${e(ev[mode])} · Toronto</strong></div><div><span>RACE DISTANCE</span><strong>${e(ev.laps)} laps</strong></div><div><span>MAP CODE</span><strong>${e(t?.code)}</strong></div></div>${eventRegistration(ev)}</div></div>${ev.status === "past" ? `<div class="section-head" style="margin-top:45px"><h3>${mode === "race" ? "RACE CLASSIFICATION" : "QUALIFYING CLASSIFICATION"}</h3></div><div class="table-wrap"><table><thead><tr><th>Position</th><th>Driver</th><th>${mode === "race" ? "Race time / gap" : "Fastest lap"}</th></tr></thead><tbody>${results.map((r, i) => `<tr><td class="number">${i + 1}</td><td>${driverCell(driver(r.driver))}</td><td class="lap">${e(mode === "race" ? r.time : r.qualifying)}</td></tr>`).join("") || '<tr><td colspan="3" class="empty">Results have not been added.</td></tr>'}</tbody></table></div>` : ""}</section>`;
 }
+const badgeIcons = {
+  developer: '<path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16"/>',
+  admin:
+    '<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/>',
+  winner:
+    '<path d="M8 3h8v7a4 4 0 0 1-8 0V3Zm4 11v5m-4 2h8M8 5H4v3a4 4 0 0 0 4 4m8-7h4v3a4 4 0 0 1-4 4"/>',
+  pole: '<path d="M5 22V3m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0"/>',
+  record:
+    '<circle cx="12" cy="13" r="8"/><path d="M9 2h6m-3 7v5l3 2m4-13 2 2"/>',
+};
+function badges(id, compact = false) {
+  const role = roleFor(db, id),
+    a = achievements(db, id),
+    items = [];
+  if (role === "developer") items.push(["developer", "Developer", 0]);
+  else if (role === "admin") items.push(["admin", "Admin", 0]);
+  if (!compact) {
+    if (a.wins) items.push(["winner", "Event Winner", a.wins]);
+    if (a.poles) items.push(["pole", "Event Pole", a.poles]);
+    if (a.records) items.push(["record", "Lap Record", a.records]);
+  }
+  return items.length
+    ? `<span class="driver-badges ${compact ? "compact-badges" : ""}">${items.map(([kind, label, n]) => `<span class="driver-badge badge-${kind}" title="${label}${n ? " · " + n : ""}"><svg viewBox="0 0 24 24" aria-hidden="true">${badgeIcons[kind]}</svg><span>${label}</span>${n > 1 ? `<b>${n}</b>` : ""}</span>`).join("")}</span>`
+    : "";
+}
+function cover(d) {
+  return `<div class="profile-cover ${d.banner && safeURL(d.banner) ? "has-banner" : ""}">${d.banner && safeURL(d.banner) ? `<img src="${e(safeURL(d.banner))}" alt="${e(d.name)} profile banner" loading="lazy">` : '<div class="cover-orbit"></div><img class="cover-mark" src="assets/fra-logo.png" alt="">'}</div>`;
+}
 function drivers() {
-  let items = db.drivers
+  const items = db.drivers
     .filter((d) => d.complete !== false)
     .filter((d) =>
       (d.name + " " + d.country)
@@ -185,14 +225,22 @@ function drivers() {
         ? a.registered.localeCompare(b.registered)
         : a.name.localeCompare(b.name),
   );
-  return `<section class="page">${pageHeading("THE DRIVERBASE", "MEET YOUR GRID.", "Different countries. Different racing lines. One shared obsession.")}${notice()}<div class="filters"><input id="driver-search" aria-label="Search drivers by name or country" placeholder="Search drivers or countries…" value="${e(driverSearch)}"><select id="driver-sort" aria-label="Sort drivers">${options(
+  return `<section class="page">${pageHeading("THE DRIVERBASE", "MEET YOUR GRID.", "Different racing lines. One shared obsession.")}${notice()}<div class="filters driver-filters"><div class="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input id="driver-search" aria-label="Search drivers by name or country" placeholder="Search drivers or countries…" value="${e(driverSearch)}"></div><select id="driver-sort" aria-label="Sort drivers">${options(
     [
       ["name", "Name: A–Z"],
       ["newest", "Newest registered"],
       ["oldest", "Oldest registered"],
     ],
     driverSort,
-  )}</select><span class="tiny muted">${items.length} DRIVERS</span></div><div class="table-wrap"><table><thead><tr><th>Driver</th><th>Number</th><th>Country</th><th>Date registered</th><th></th></tr></thead><tbody>${items.map((d) => `<tr><td>${driverCell(d)}</td><td class="number">${e(d.number)}</td><td>${e(d.flag)} ${e(d.country)}</td><td>${date(d.registered)}</td><td><button class="text-button" data-action="profile" data-id="${e(d.id)}">PROFILE ${arrow}</button></td></tr>`).join("") || '<tr><td colspan="5" class="empty">No drivers match your search.</td></tr>'}</tbody></table></div></section>`;
+  )}</select><span class="tiny muted">${items.length} DRIVERS</span></div><div class="driver-directory" role="list" aria-label="Registered drivers">${
+    items
+      .map((d) => {
+        const a = achievements(db, d.id),
+          stats = db.statistics?.find((s) => s.driver_id === d.id);
+        return `<article role="listitem"><button class="driver-row" data-action="profile" data-id="${e(d.id)}" aria-label="View ${e(d.name)}'s driver profile">${avatar(d)}<span class="driver-row-identity"><strong>${e(d.name)}</strong><small>${e(d.flag)} ${e(d.country)}${d.number ? " · #" + e(d.number) : ""}</small></span><span class="driver-row-badges">${badges(d.id)}</span><span class="driver-row-stats"><span><b>${stats?.events_entered ?? historyForDriver(d.id).length}</b><small>Events</small></span><span><b>${a.wins}</b><small>Wins</small></span><span><b>${a.records}</b><small>Records</small></span></span><span class="driver-row-arrow">${arrow}</span></button></article>`;
+      })
+      .join("") || '<div class="empty">No drivers match your search.</div>'
+  }</div></section>`;
 }
 function bestLaps() {
   let map = new Map();
@@ -210,8 +258,10 @@ function bestLaps() {
   return [...map.values()].sort((a, b) => a.ms - b.ms);
 }
 function board() {
-  const f = boardFilters;
-  let tracks = db.tracks.filter((t) => !f.creator || t.creator === f.creator);
+  const setup = leaderboardSetup(db.tracks, boardFilters);
+  Object.assign(boardFilters, setup.filters);
+  const f = boardFilters,
+    tracks = setup.tracks;
   let records = bestLaps().filter(
     (l) =>
       (!f.creator || track(l.track)?.creator === f.creator) &&
@@ -229,7 +279,15 @@ function board() {
     tracks.map((t) => [t.id, t.name]),
     f.track,
     "All tracks",
-  )}</select></label><label>WEATHER<select data-filter="weather">${options(["Dry", "Light Rain", "Heavy Rain"], f.weather, "All conditions")}</select></label><label>CAR CLASS<select data-filter="car">${options(["Prevalents", "Whiplashes", "Customs"], f.car, "All cars")}</select></label><label>TIRES<select data-filter="tire">${options([["none", "None / not recorded"], ...TIRES], f.tire, "All tires")}</select></label>${f.car === "Customs" ? `<label>CUSTOM CAR<input id="custom-filter" placeholder="Filter custom car…" value="${e(f.custom)}"></label>` : ""}</div><p class="helper">Rankings are per track, weather, car and tire compound. Filter your setup to compare like-for-like laps.</p><div class="table-wrap"><table><thead><tr><th>Position</th><th>Driver</th><th>Track</th><th>Conditions</th><th>Car</th><th>Tires</th><th>Best lap</th><th>Proof</th></tr></thead><tbody>${
+  )}</select></label>${setup.showWeather ? `<label>WEATHER<select data-filter="weather">${options(setup.weather, f.weather, "All conditions")}</select></label>` : ""}${setup.showCars ? `<label>CAR CLASS<select data-filter="car">${options(setup.cars, f.car, "All cars")}</select></label>` : ""}${
+    setup.showTires
+      ? `<label>TIRES<select data-filter="tire">${options(
+          setup.tires.map((t) => [t, t === "none" ? "No tires" : t]),
+          f.tire,
+          "All tires",
+        )}</select></label>`
+      : ""
+  }${f.car === "Customs" ? `<label>CUSTOM CAR<input id="custom-filter" placeholder="Filter custom car…" value="${e(f.custom)}"></label>` : ""}</div>${setup.selected ? `<p class="track-setup-note">TRACK SETUP <span>${e([!setup.showWeather ? setup.weather[0] : "", !setup.showCars ? setup.cars[0] : "", !setup.selected.hasTires ? "No tires" : !setup.showTires ? setup.tires[0] : ""].filter(Boolean).join(" · ") || "Choose your conditions above")}</span></p>` : ""}<p class="helper">Rankings are per track, weather, car and tire compound. Filter your setup to compare like-for-like laps.</p><div class="table-wrap"><table><thead><tr><th>Position</th><th>Driver</th><th>Track</th><th>Conditions</th><th>Car</th><th>Tires</th><th>Best lap</th><th>Proof</th></tr></thead><tbody>${
     records
       .map((l) => {
         let group = records.filter(
@@ -250,8 +308,8 @@ function board() {
 function tireLabel(l) {
   return l.tire || (track(l.track)?.hasTires ? "Not recorded" : "No tires");
 }
-function lapRecord(t, compact = false) {
-  const record = live
+function recordForTrack(t) {
+  return live
     ? db.laps.find(
         (l) =>
           l.id === (db.records || []).find((r) => r.track_id === t.id)?.lap_id,
@@ -267,10 +325,21 @@ function lapRecord(t, compact = false) {
             a.date.localeCompare(b.date) ||
             a.id.localeCompare(b.id),
         )[0];
+}
+function lapRecord(t, compact = false) {
+  const record = recordForTrack(t);
   return `<div class="lap-record ${compact ? "compact" : ""}"><div class="eyebrow">LAP RECORD</div>${record ? `<div class="record-main"><strong>${formatLap(record.ms)}</strong>${driverCell(driver(record.driver))}</div><p class="helper">${e(record.weather)} · ${e(record.custom || record.car)} · ${e(tireLabel(record))}${record.sample ? " · Sample record" : ""}</p>${compact ? "" : `<p class="helper">Fastest approved lap across all setups. ${date(record.date)}.</p>${record.sample ? "" : `<button class="text-button" data-action="proof" data-id="${e(record.id)}">WATCH RECORD LAP ↗</button>`}`}` : '<strong class="no-record">Be the first to set the record.</strong><p class="helper">Your fastest approved lap will appear here.</p>'}</div>`;
 }
 function trackCard(t) {
-  return `<article class="track-card"><a class="track-visual" style="display:block" href="#track/${e(t.id)}"><img src="${image(t)}" alt="${e(t.name)} circuit" loading="lazy"></a><div class="event-content"><div class="event-meta">RELEASED ${date(t.released).toUpperCase()} · MAP ${e(t.code)}</div><h3><a href="#track/${e(t.id)}">${e(t.name)}</a></h3><p>${e(t.description)}</p><div class="track-chips">${t.weather.map((w) => `<span>${e(w)}</span>`).join("")}${t.cars.map((c) => `<span>${e(c)}</span>`).join("")}<span>${t.hasTires ? "TIRES AVAILABLE" : "NO TIRES"}</span></div>${lapRecord(t, true)}<div class="event-bottom"><a class="text-button" href="#track/${e(t.id)}">TRACK DETAILS ${arrow}</a>${adminPreview ? `<button class="outline" data-action="edit-track" data-id="${e(t.id)}">EDIT TRACK</button>` : `<a class="text-button" href="#submit/${e(t.id)}">SET A LAP ↗</a>`}</div></div></article>`;
+  const record = recordForTrack(t);
+  const availability = [
+    t.weather.length === 1
+      ? t.weather[0]
+      : t.weather.length + " weather options",
+    t.cars.length === 1 ? t.cars[0] : t.cars.length + " car classes",
+    t.hasTires ? t.tires.length + " tire compounds" : "No tires",
+  ];
+  return `<article class="track-card track-mini"><a class="track-visual" href="#track/${e(t.id)}"><img src="${image(t)}" alt="${e(t.name)} circuit" loading="lazy"></a><div class="event-content"><div class="track-mini-meta"><span>MAP ${e(t.code)}</span><span>${date(t.released)}</span></div><h3><a href="#track/${e(t.id)}">${e(t.name)}</a></h3><p class="track-availability">${e(availability.join(" · "))}</p><div class="track-mini-record"><span>LAP RECORD</span><strong>${record ? formatLap(record.ms) : "—"}</strong></div><div class="event-bottom"><a class="text-button" href="#track/${e(t.id)}">VIEW TRACK ${arrow}</a>${adminPreview ? `<button class="text-button" data-action="edit-track" data-id="${e(t.id)}">EDIT ↗</button>` : `<a class="text-button" href="#submit/${e(t.id)}">SET A LAP ↗</a>`}</div></div></article>`;
 }
 function trackDirectory() {
   return (
@@ -315,7 +384,7 @@ function submitPage(id) {
   return `<section class="page">${pageHeading("PUT YOUR LAP ON THE BOARD", "MAKE YOUR MARK.", "A clean lap. The right conditions. Video proof. Show the grid what you’ve got.")}${notice()}${
     unavailable
       ? '<div class="empty">There are no tracks available for submissions yet.</div>'
-      : `<div class="form-layout"><form id="lap-form" class="form-panel"><h3>LAP SUBMISSION</h3><p class="helper" style="margin-bottom:25px">${demo ? "Design preview · Choose a sample driver to test the flow." : "Submitting as " + e(currentDriver()?.name) + ". Your lap goes to race control for review."}</p><div class="form-grid"><div class="field full"><label for="lap-driver">DRIVER</label><select id="lap-driver" name="driver" required>${options((demo ? db.drivers : [currentDriver()]).map((d) => [d.id, d.name]))}</select></div><div class="field"><label for="lap-creator">TRACK CREATOR</label><select id="lap-creator" name="creator" required>${options(
+      : `<div class="form-layout"><form id="lap-form" class="form-panel"><h3>LAP SUBMISSION</h3><p class="helper" style="margin-bottom:25px">${demo ? "Design preview · Choose a sample driver to test the flow." : "Submitting as " + e(currentDriver()?.name) + ". Your lap goes to the Admin Panel for review."}</p><div class="form-grid"><div class="field full"><label for="lap-driver">DRIVER</label><select id="lap-driver" name="driver" required>${options((demo ? db.drivers : [currentDriver()]).map((d) => [d.id, d.name]))}</select></div><div class="field"><label for="lap-creator">TRACK CREATOR</label><select id="lap-creator" name="creator" required>${options(
           db.creators.map((c) => [c.id, c.name]),
           t.creator,
         )}</select></div><div class="field"><label for="lap-track">TRACK</label><select id="lap-track" name="track" required>${options(
@@ -328,10 +397,22 @@ function submitPage(id) {
 }
 function admin() {
   if (!canAdmin())
-    return accountPage("Race control is available to FRA administrators.");
-  return `<section class="page">${pageHeading("RACE CONTROL", "THE ADMIN PADDOCK.", "Manage the grid, build the calendar, and keep the competition fair.")}${notice()}<div class="admin-nav">${["overview", "drivers", "events", "creators", "tracks", "submissions"].map((t) => `<button data-action="admin-tab" data-tab="${t}" class="${adminTab === t ? "selected" : ""}">${t[0].toUpperCase() + t.slice(1)}${t === "submissions" ? ` (${db.laps.filter((l) => l.status === "pending").length})` : ""}</button>`).join("")}</div>${adminContent()}</section>`;
+    return accountPage("Admin Panel is available to FRA administrators.");
+  return `<section class="page">${pageHeading("ADMIN PANEL", "ADMIN PANEL.", "Manage the grid, build the calendar, and keep the competition fair.")}${notice()}<div class="admin-nav">${["overview", "drivers", "events", "creators", "tracks", "submissions", ...(backend.identity.developer ? ["access"] : [])].map((t) => `<button data-action="admin-tab" data-tab="${t}" class="${adminTab === t ? "selected" : ""}">${t[0].toUpperCase() + t.slice(1)}${t === "submissions" ? ` (${db.laps.filter((l) => l.status === "pending").length})` : ""}</button>`).join("")}</div>${adminContent()}</section>`;
 }
 function adminContent() {
+  if (adminTab === "access") {
+    if (!backend.identity.developer)
+      return '<p class="empty">Developer access required.</p>';
+    return `<div class="admin-toolbar"><div><h3>Website access</h3><p class="helper">Choose who can manage drivers, events, tracks and submissions.</p></div><span class="driver-badge badge-developer"><svg viewBox="0 0 24 24" aria-hidden="true">${badgeIcons.developer}</svg>Developer only</span></div><div class="access-list">${db.drivers
+      .filter((d) => d.complete)
+      .map((d) => {
+        const role = roleFor(db, d.id);
+        return `<div class="access-row">${driverCell(d)}<span class="muted">${role === "developer" ? "Protected developer" : role === "admin" ? "Administrator" : "Driver"}</span>${role === "developer" ? '<span class="helper">Permanent owner</span>' : `<button class="${role === "admin" ? "outline" : "button"}" data-action="set-admin" data-id="${e(d.id)}" data-enabled="${role !== "admin"}" ${!d.active && role !== "admin" ? "disabled" : ""}>${role === "admin" ? "REMOVE ADMIN" : "MAKE ADMIN"} ↗</button>`}</div>`;
+      })
+      .join("")}</div>`;
+  }
+
   if (adminTab === "overview")
     return `<div class="admin-stat-grid">${[
       [db.drivers.length, "REGISTERED DRIVERS"],
@@ -421,6 +502,8 @@ function notFound() {
   return `<section class="page">${pageHeading("OFF THE RACING LINE", "PAGE NOT FOUND.", "Return to the paddock to find your next race.", '<a class="button" href="#home">BACK TO PADDOCK ↗</a>')}</section>`;
 }
 function render(scroll = false) {
+  cleanTitle();
+  cleanTitle = () => {};
   cleanCar();
   cleanCar = () => {};
   let [page = "home", id] = (location.hash.slice(1) || "home").split("/");
@@ -457,9 +540,12 @@ function render(scroll = false) {
                           : page === "admin"
                             ? admin()
                             : notFound();
-  document.title = `${{ home: "Find your limit.", events: "Events", history: "Event history", drivers: "Driverbase", tracks: "Tracks", track: "Track details", "time-trials": "Time trials", submit: "Submit a lap", account: "My profile", admin: "Race control", event: "Event details" }[page] || "Paddock"} — Fortnite Racing Association`;
-  if (page === "home" && !loading && !loadError)
+  document.title = `${{ home: "Find your limit.", events: "Events", history: "Event history", drivers: "Driverbase", tracks: "Tracks", track: "Track details", "time-trials": "Time trials", submit: "Submit a lap", account: "My profile", admin: "Admin Panel", event: "Event details" }[page] || "Paddock"} — Fortnite Racing Association`;
+  enhanceControls(app);
+  if (page === "home" && !loading && !loadError) {
     cleanCar = carScene($(".car-stage"));
+    cleanTitle = titleMotion($(".hero-title"));
+  }
   if (scroll) window.scrollTo({ top: 0, behavior: "instant" });
 }
 function field(
@@ -663,6 +749,7 @@ function updateSubmit() {
   $("#submit-track-name").textContent = t.name;
   $("#submit-track-desc").textContent = t.description;
   updateCustom();
+  enhanceControls(app);
 }
 function updateCustom() {
   let on = $("#lap-car").value === "Customs";
@@ -730,9 +817,9 @@ function accountPage(message = "") {
   if (!d)
     return statusPage(
       "YOUR DRIVER PROFILE IS NOT READY.",
-      "Please contact FRA race control.",
+      "Please contact FRA the Admin Panel.",
     );
-  return `<section class="page">${pageHeading("YOUR DRIVER PROFILE", d.complete ? "WELCOME BACK, " + e(d.name).toUpperCase() + "." : "TAKE YOUR PLACE.", message || "Make the grid your own. Your account keeps your events and lap times together.", '<button class="outline" data-action="signout">SIGN OUT ↗</button>')}${d.active ? "" : '<div class="notice">Your driver account is inactive. Contact race control to enter events or submit laps.</div>'}<div class="form-layout"><form id="profile-form" class="form-panel"><h3>${d.complete ? "EDIT YOUR PROFILE" : "COMPLETE REGISTRATION"}</h3><div class="form-grid">${field("name", "DRIVER NAME", d.complete ? d.name : "", "text", true, 'minlength="3" maxlength="32" autocomplete="nickname"')}${countryField(d.country)}${field("number", "RACE NUMBER · OPTIONAL", d.number, "text", false, 'pattern="[0-9]{0,3}" maxlength="3"')}<div class="field"><label for="profile-avatar">PROFILE PICTURE</label><input id="profile-avatar" name="avatarFile" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG or WebP · up to 5 MB. A Discord picture is used when available.</small></div><div class="field full"><label for="profile-banner">BANNER · OPTIONAL</label><input id="profile-banner" name="bannerFile" type="file" accept="image/png,image/jpeg,image/webp"><small>A wide image works best · up to 5 MB.</small>${d.banner ? '<label class="checks"><input type="checkbox" name="removeBanner"> Remove current banner</label>' : ""}</div><div class="field full"><label for="profile-bio">BIO · OPTIONAL</label><textarea id="profile-bio" name="bio" maxlength="500">${e(d.bio)}</textarea></div><p id="profile-error" class="error full" role="alert"></p><button class="button full" type="submit">${d.complete ? "SAVE PROFILE" : "FINISH REGISTRATION"} ↗</button></div></form><aside><div class="form-panel">${d.banner ? `<img class="profile-banner" src="${e(safeURL(d.banner))}" alt="Your profile banner">` : ""}<div class="profile-hero">${avatar(d)}<div><h3>${e(d.complete ? d.name : "YOUR DRIVER NAME")}</h3><p>${e(d.flag)} ${e(d.country)}</p></div></div><button class="outline" data-action="profile" data-id="${e(d.id)}">VIEW DRIVER PROFILE ↗</button></div>${backend.identity.user.email ? `<form id="password-form" class="form-panel password-settings"><h3>EMAIL SIGN-IN</h3><p class="helper">${e(backend.identity.user.email)}</p><p class="body-copy">Set or update a password to sign in with this email.</p>${field("newPassword", "NEW PASSWORD", "", "password", true, 'autocomplete="new-password" minlength="8" maxlength="128"')}<small class="muted">At least 8 characters.</small><p id="password-error" class="error" role="alert"></p><button class="outline" type="submit">SAVE PASSWORD ↗</button></form>` : ""}<div class="rule"><b>01</b><div><strong>Your events</strong>${
+  return `<section class="page">${pageHeading("YOUR DRIVER PROFILE", d.complete ? "WELCOME BACK, " + e(d.name).toUpperCase() + "." : "TAKE YOUR PLACE.", message || "Make the grid your own. Your account keeps your events and lap times together.", '<button class="outline" data-action="signout">SIGN OUT ↗</button>')}${d.active ? "" : '<div class="notice">Your driver account is inactive. Contact the Admin Panel to enter events or submit laps.</div>'}<div class="form-layout"><form id="profile-form" class="form-panel"><h3>${d.complete ? "EDIT YOUR PROFILE" : "COMPLETE REGISTRATION"}</h3><div class="form-grid">${field("name", "DRIVER NAME", d.complete ? d.name : "", "text", true, 'minlength="3" maxlength="32" autocomplete="nickname"')}${countryField(d.country)}${field("number", "RACE NUMBER · OPTIONAL", d.number, "text", false, 'pattern="[0-9]{0,3}" maxlength="3"')}<div class="field"><label for="profile-avatar">PROFILE PICTURE</label><input id="profile-avatar" name="avatarFile" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG or WebP · up to 5 MB. A Discord picture is used when available.</small></div><div class="field full"><label for="profile-banner">BANNER · OPTIONAL</label><input id="profile-banner" name="bannerFile" type="file" accept="image/png,image/jpeg,image/webp"><small>16:9 recommended · up to 5 MB.</small>${d.banner ? '<label class="checks"><input type="checkbox" name="removeBanner"> Remove current banner</label>' : ""}</div><div class="field full"><label for="profile-bio">BIO · OPTIONAL</label><textarea id="profile-bio" name="bio" maxlength="500">${e(d.bio)}</textarea></div><p id="profile-error" class="error full" role="alert"></p><button class="button full" type="submit">${d.complete ? "SAVE PROFILE" : "FINISH REGISTRATION"} ↗</button></div></form><aside><div class="profile-preview">${cover(d)}<div class="profile-preview-body"><div class="profile-hero">${avatar(d)}<div><h3>${e(d.complete ? d.name : "YOUR DRIVER NAME")}</h3><p>${e(d.flag)} ${e(d.country)}</p></div></div>${badges(d.id)}<button class="outline" data-action="profile" data-id="${e(d.id)}">VIEW DRIVER PROFILE ↗</button></div></div>${backend.identity.user.email ? `<form id="password-form" class="form-panel password-settings"><h3>EMAIL SIGN-IN</h3><p class="helper">${e(backend.identity.user.email)}</p><p class="body-copy">Set or update a password to sign in with this email.</p>${field("newPassword", "NEW PASSWORD", "", "password", true, 'autocomplete="new-password" minlength="8" maxlength="128"')}<small class="muted">At least 8 characters.</small><p id="password-error" class="error" role="alert"></p><button class="outline" type="submit">SAVE PASSWORD ↗</button></form>` : ""}<div class="rule"><b>01</b><div><strong>Your events</strong>${
     db.events
       .filter((v) =>
         (db.registrations || []).some(
@@ -771,7 +858,7 @@ function eventRegistration(ev) {
     entered = (db.registrations || []).some(
       (r) => r.event_id === ev.id && r.driver_id === d?.id,
     );
-  return `<p class="helper">${count} driver${count === 1 ? "" : "s"} entered</p>${!d?.complete ? '<a class="button" href="#account">REGISTER TO RACE ↗</a>' : !d.active ? '<p class="notice">Your driver account is inactive. Contact race control.</p>' : `<button class="${entered ? "outline" : "button"}" data-action="${entered ? "cancel-entry" : "enter-event"}" data-id="${e(ev.id)}">${entered ? "CANCEL MY ENTRY" : "ENTER THIS EVENT"} ↗</button>`}`;
+  return `<p class="helper">${count} driver${count === 1 ? "" : "s"} entered</p>${!d?.complete ? '<a class="button" href="#account">REGISTER TO RACE ↗</a>' : !d.active ? '<p class="notice">Your driver account is inactive. Contact the Admin Panel.</p>' : `<button class="${entered ? "outline" : "button"}" data-action="${entered ? "cancel-entry" : "enter-event"}" data-id="${e(ev.id)}">${entered ? "CANCEL MY ENTRY" : "ENTER THIS EVENT"} ↗</button>`}`;
 }
 function recordsForDriver(id) {
   if (live)
@@ -830,19 +917,20 @@ function profile(id) {
       : db.statistics.find((s) => s.driver_id === id) || {};
   showModal(
     "DRIVER PROFILE",
-    `${d.banner ? `<img class="profile-banner" src="${e(safeURL(d.banner))}" alt="${e(d.name)} profile banner">` : ""}<div class="profile-hero">${avatar(d)}<div><h2>${e(d.name)}</h2><p>${e(d.flag)} ${e(d.country)} ${d.number ? "· #" + e(d.number) : ""}</p></div></div><p class="body-copy">${e(d.bio)}</p><div class="profile-stats">${[
-      ["events_entered", "Events entered"],
-      ["events_won", "Events won"],
-      ["event_podiums", "Event podiums"],
+    `${cover(d)}<div class="profile-body"><div class="profile-identity"><div class="profile-avatar">${avatar(d)}</div><span class="profile-number">${d.number ? "#" + e(d.number) : "FRA DRIVER"}</span></div><h2>${e(d.name)}</h2><p class="profile-country">${e(d.flag)} ${e(d.country)}</p>${badges(id)}${d.bio ? `<p class="profile-bio">${e(d.bio)}</p>` : ""}<div class="profile-stats">${[
+      ["events_entered", "Events"],
+      ["events_won", "Wins"],
+      ["event_podiums", "Podiums"],
       ["lap_records", "Lap records"],
     ]
       .map(
-        ([k, l]) =>
-          `<div><strong>${stats[k] || 0}</strong><span>${l}</span></div>`,
+        ([key, label]) =>
+          `<div><strong>${stats[key] || 0}</strong><span>${label}</span></div>`,
       )
       .join(
         "",
-      )}</div><h3>LAP RECORDS</h3><div class="profile-records">${records.map((l) => `<a href="#track/${e(l.track)}" class="profile-record"><span>${e(track(l.track)?.name)}<small>${e(l.weather)} · ${e(l.custom || l.car)} · ${e(tireLabel(l))}</small></span><strong class="lap yellow">${formatLap(l.ms)}</strong></a>`).join("") || '<p class="helper">No lap records yet. The next one could be yours.</p>'}</div><div class="form-actions"><span class="helper">Registered ${date(d.registered)}${demo ? " · Sample driver" : ""}</span><button class="button" data-action="driver-history" data-id="${e(id)}">HISTORY ↗</button></div>`,
+      )}</div><details class="profile-records-section"><summary>Lap records <span>${records.length} ${arrow}</span></summary><div class="profile-records">${records.map((l) => `<a href="#track/${e(l.track)}" class="profile-record"><span>${e(track(l.track)?.name)}<small>${e(l.weather)} · ${e(l.custom || l.car)} · ${e(tireLabel(l))}</small></span><strong class="lap yellow">${formatLap(l.ms)}</strong></a>`).join("") || '<p class="helper">Your next fastest lap starts here.</p>'}</div></details><div class="profile-footer"><span class="helper">On the grid since ${date(d.registered)}</span><button class="outline" data-action="driver-history" data-id="${e(id)}">HISTORY ${arrow}</button></div></div>`,
+    "profile-dialog",
   );
 }
 function driverHistory(id) {
@@ -947,6 +1035,12 @@ document.addEventListener("click", async (ev) => {
     render();
     return refresh();
   }
+  if (a === "register") {
+    authMode = "register";
+    authNotice = "";
+    if (location.hash === "#account") render();
+    return;
+  }
   if (a === "auth-mode") {
     if (writeBusy) return;
     authEmail = $("#f-email")?.value || authEmail;
@@ -1003,6 +1097,7 @@ document.addEventListener("click", async (ev) => {
     return;
   }
   const adminAction =
+    a === "set-admin" ||
     a === "admin-tab" ||
     a === "add-result" ||
     a === "remove-result" ||
@@ -1013,6 +1108,18 @@ document.addEventListener("click", async (ev) => {
   if (!adminAction) return;
   return writeAction(b, async () => {
     requireAdmin();
+    if (a === "set-admin") {
+      if (!backend.identity.developer)
+        throw Error("Developer access required.");
+      await backend.setDriverAdmin(id, b.dataset.enabled === "true");
+      await refresh();
+      toast(
+        b.dataset.enabled === "true"
+          ? "Administrator added."
+          : "Administrator removed.",
+      );
+      return;
+    }
     if (a === "admin-tab") {
       adminTab = b.dataset.tab;
       render();
@@ -1023,8 +1130,11 @@ document.addEventListener("click", async (ev) => {
       render();
       return;
     }
-    if (a === "add-result")
-      return $("#result-rows").insertAdjacentHTML("beforeend", resultRow());
+    if (a === "add-result") {
+      $("#result-rows").insertAdjacentHTML("beforeend", resultRow());
+      enhanceControls(modal);
+      return;
+    }
     if (a === "remove-result") return b.closest(".result-row").remove();
     if (a.startsWith("edit-")) return editor(a.slice(5), id);
     if (["add-driver", "add-track", "add-event", "add-creator"].includes(a)) {
@@ -1105,7 +1215,7 @@ document.addEventListener("submit", (ev) => {
         f.reset();
         if (registering && !result.session) {
           authNotice =
-            "Your account is awaiting email confirmation. Contact FRA race control to finish signing in.";
+            "Your account is awaiting email confirmation. Contact FRA the Admin Panel to finish signing in.";
           render();
           return;
         }
@@ -1216,7 +1326,7 @@ document.addEventListener("submit", (ev) => {
         }
         showModal(
           "LAP SUBMITTED.",
-          `<p class="body-copy">Your ${formatLap(ms)} at ${e(t.name)} is queued for review.</p><p class="helper">Race control will check your clip before publishing the lap.</p><div class="form-actions"><a class="button" href="#${demo ? "admin" : "account"}">${demo ? "VIEW SUBMISSIONS" : "MY SUBMISSIONS"} ↗</a></div>`,
+          `<p class="body-copy">Your ${formatLap(ms)} at ${e(t.name)} is queued for review.</p><p class="helper">Admin Panel will check your clip before publishing the lap.</p><div class="form-actions"><a class="button" href="#${demo ? "admin" : "account"}">${demo ? "VIEW SUBMISSIONS" : "MY SUBMISSIONS"} ↗</a></div>`,
         );
         adminTab = "submissions";
         f.reset();

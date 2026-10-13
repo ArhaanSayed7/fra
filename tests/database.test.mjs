@@ -56,6 +56,15 @@ test("FRA migration and database access rules", async (t) => {
       "utf8",
     ),
   );
+  await pg.exec(
+    await readFile(
+      new URL(
+        "../supabase/migrations/20261013013150_fra_developer_roles.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   for (const id of [owner, other, incomplete, admin])
     await root(
       `insert into auth.users(id,raw_app_meta_data,raw_user_meta_data) values($1,'{"provider":"discord"}','{"avatar_url":"https://cdn.discordapp.com/avatar.png"}')`,
@@ -520,5 +529,128 @@ test("FRA migration and database access rules", async (t) => {
       1,
     );
   });
+  await t.test(
+    "only the protected developer can grant or revoke website admin access",
+    async () => {
+      await root("insert into private.developer_users(user_id) values($1)", [
+        owner,
+      ]);
+      assert.equal(
+        (await as("authenticated", owner, "select public.is_developer() as ok"))
+          .rows[0].ok,
+        true,
+      );
+      assert.equal(
+        (await as("authenticated", owner, "select public.is_admin() as ok"))
+          .rows[0].ok,
+        true,
+      );
+      assert.equal(
+        (await as("authenticated", other, "select public.is_developer() as ok"))
+          .rows[0].ok,
+        false,
+      );
+      await assert.rejects(
+        as("anon", null, "select public.set_driver_admin($1,true)", [other]),
+        /permission denied/,
+      );
+      await assert.rejects(
+        as("authenticated", other, "select public.set_driver_admin($1,true)", [
+          other,
+        ]),
+        /Only the website developer/,
+      );
+      await assert.rejects(
+        as("authenticated", admin, "select public.set_driver_admin($1,true)", [
+          other,
+        ]),
+        /Only the website developer/,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          other,
+          "insert into private.developer_users(user_id) values($1)",
+          [other],
+        ),
+        /permission denied/,
+      );
+      await assert.rejects(
+        as("authenticated", owner, "select public.set_driver_admin($1,false)", [
+          owner,
+        ]),
+        /protected/,
+      );
+      await assert.rejects(
+        as("authenticated", owner, "select public.set_driver_admin($1,true)", [
+          incomplete,
+        ]),
+        /registered driver/,
+      );
+      await root("update public.drivers set is_active=false where id=$1", [
+        other,
+      ]);
+      await assert.rejects(
+        as("authenticated", owner, "select public.set_driver_admin($1,true)", [
+          other,
+        ]),
+        /Activate this driver/,
+      );
+      await root("update public.drivers set is_active=true where id=$1", [
+        other,
+      ]);
+      await as(
+        "authenticated",
+        owner,
+        "select public.set_driver_admin($1,true)",
+        [other],
+      );
+      assert.equal(
+        (await as("authenticated", other, "select public.is_admin() as ok"))
+          .rows[0].ok,
+        true,
+      );
+      await assert.rejects(
+        as("authenticated", other, "select public.set_driver_admin($1,true)", [
+          incomplete,
+        ]),
+        /Only the website developer/,
+      );
+      const roles = (
+        await as(
+          "anon",
+          null,
+          "select * from public.driver_roles() order by driver_id",
+        )
+      ).rows;
+      assert.deepEqual(roles, [
+        { driver_id: owner, role: "developer" },
+        { driver_id: other, role: "admin" },
+      ]);
+      await assert.rejects(
+        as("anon", null, "select * from private.developer_users"),
+        /permission denied/,
+      );
+      await assert.rejects(
+        as("authenticated", other, "select * from private.admin_users"),
+        /permission denied/,
+      );
+      await as(
+        "authenticated",
+        owner,
+        "select public.set_driver_admin($1,false)",
+        [other],
+      );
+      assert.equal(
+        (await as("authenticated", other, "select public.is_admin() as ok"))
+          .rows[0].ok,
+        false,
+      );
+      assert.deepEqual(
+        (await as("anon", null, "select * from public.driver_roles()")).rows,
+        [{ driver_id: owner, role: "developer" }],
+      );
+    },
+  );
   await pg.close();
 });

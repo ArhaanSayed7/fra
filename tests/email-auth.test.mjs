@@ -75,7 +75,12 @@ test("email signup immediately signs in, password login restores the same profil
           )
         : Response.json(session);
     if (url.pathname === "/auth/v1/user") return Response.json(user);
-    if (url.pathname === "/rest/v1/rpc/is_admin") return Response.json(false);
+    if (
+      ["/rest/v1/rpc/is_admin", "/rest/v1/rpc/is_developer"].includes(
+        url.pathname,
+      )
+    )
+      return Response.json(false);
     if (url.pathname === "/auth/v1/logout")
       return new Response(null, { status: 204 });
     throw Error("Unexpected auth request: " + url.pathname);

@@ -18,7 +18,7 @@ In the new FRA project, open **SQL Editor** → **New query**. Copy the complete
 
 `supabase/migrations/202610120001_fra.sql`
 
-Run it once. Then run `supabase/migrations/202610120002_access_indexes.sql` in a second query, followed by `supabase/migrations/20261012224350_fra_email_registration.sql` in a third query. Together they create drivers for Discord and email accounts, creators, tracks, events, event entries/results, lap submissions, country choices, computed statistics/history, admin permission checks and the `driver-media` image bucket. They do not add sample drivers or events. Use a fresh FRA project; do not run them against another application's existing database. All three have already been applied to the owner's FRA project; do not rerun them there.
+Run it once. Then run `supabase/migrations/202610120002_access_indexes.sql` in a second query, followed by `supabase/migrations/20261012224350_fra_email_registration.sql` in a third query. Finally run `supabase/migrations/20261013013150_fra_developer_roles.sql` in a fourth query. Together they create drivers for Discord and email accounts, creators, tracks, events, event entries/results, lap submissions, country choices, computed statistics/history, admin permission checks and the `driver-media` image bucket. They do not add sample drivers or events. Use a fresh FRA project; do not run them against another application's existing database. All four have already been applied to the owner's FRA project; do not rerun them there.
 
 If the query fails, the transaction rolls back. Fix the reported issue before rerunning. After a successful run, do not rerun the same migration: it is a one-time schema setup, not an update script.
 
@@ -79,22 +79,26 @@ No `#account` hash is needed in these settings. The website handles the callback
 
 In Supabase **Authentication → Sign In / Providers**, leave new-user signups enabled, enable **Email** and keep **Discord** enabled. Turn **Confirm email** off and save. Drivers can then enter an email and a password of at least eight characters, sign in immediately, and complete their driver profile. This flow needs no SMTP service. The website also provides email/password login. No password-reset email flow is included.
 
-## 7. Register yourself and enable admin access
+## 7. Register yourself and enable developer ownership
 
-1. Open your website → **Register / Log in**.
+1. Open your website → **REGISTER NOW**.
 2. Choose **Create account** and enter an email/password, or **Continue with Discord** and authorize the FRA application. Finish the driver profile with a name and country. Upload a profile picture if desired; the banner is optional.
 3. In Supabase **Authentication → Users**, find your own user and copy its **User UID**. Match the account carefully.
 4. In Supabase **SQL Editor**, replace the placeholder below with your actual User UID and run:
 
 ```sql
-insert into private.admin_users(user_id)
-values ('YOUR_USER_UID_HERE'::uuid)
+insert into private.developer_users(user_id)
+select id from public.drivers
+where id = 'YOUR_USER_UID_HERE'::uuid
+  and is_registered and is_active
 on conflict do nothing;
 ```
 
-5. Reload the website. **Race control** appears in the header and the admin panel is available.
+5. Reload the website. **Admin Panel** appears in the header (or mobile menu). Your profile has the Developer badge. The owner’s Rivers account already has this protected role; do not repeat this setup on the existing FRA project.
 
-Only the project owner or someone with database administrator access can assign this role. It is not a field drivers can edit. To remove an admin later, run the following in SQL Editor with their UID:
+Only the project owner or someone with database administrator access can assign Developer ownership. Drivers cannot edit it, and the website cannot create another Developer. Open **Admin Panel → Access** to make other active, registered drivers admins or remove their admin access. Inactive drivers must first be activated under **Drivers**. The Developer cannot be demoted from the website. Admins can manage racing content and driver profiles, but cannot appoint other admins.
+
+For emergency admin removal outside the site, the project owner can run:
 
 ```sql
 delete from private.admin_users
@@ -105,21 +109,21 @@ The role takes effect at the database immediately; reload the website to update 
 
 ## 8. Build the real calendar
 
-1. In race control, add **Creators**.
+1. In the Admin Panel, add **Creators**.
 2. Add **Tracks** under each creator with the real map code, release date, hero image URL, description, supported weather and car classes.
 3. Choose whether the track offers tires. If enabled, tick one or more of Ultrasoft, Soft, Medium, Hard, Ultrahard, Intermediate and Wet.
 4. Add an event and select a track from the list. Set the date, qualifying/race times, lap count and registration status.
-5. After a race, edit the event, mark it completed and enter driver results with unique race positions and qualifying times. Their stats/history update automatically.
+5. After a race, edit the event, mark it completed and enter driver results with unique race positions and qualifying times. Their stats/history and earned Event Winner/Event Pole badges update automatically. Current approved overall track record holders receive the Lap Record badge.
 6. Review video clips under **Submissions** before approving or rejecting laps. A rejection requires a note.
 
-Drivers register themselves using email/password or Discord. In race control you can edit their profile information and set them inactive. Inactive drivers retain past results but cannot enter events or submit laps. Authentication accounts are managed separately in Supabase; the website intentionally does not delete accounts/history.
+Drivers register themselves using email/password or Discord. In the Admin Panel you can edit their profile information and set them inactive. Inactive drivers retain past results but cannot enter events or submit laps. Authentication accounts are managed separately in Supabase; the website intentionally does not delete accounts/history.
 
 ## 9. Verify before opening registration to everyone
 
 Use your admin account and a separate ordinary email account:
 
 - Complete the second driver's profile with a country chosen by typing into the dropdown. Check avatar/banner uploads.
-- Confirm the ordinary driver cannot open race control or edit another driver.
+- Confirm the ordinary driver cannot open the Admin Panel or edit another driver.
 - Create a track with tires and enter an upcoming event from the second account. Check its entry appears on the profile.
 - Submit a lap with video proof. Check it stays off the public leaderboard until an admin approves it.
 - Approve it and confirm the leaderboard, track lap record and driver lap-record count update.
@@ -135,7 +139,7 @@ Automated database access tests are included (`npm ci`, then `npm test`). They r
 - **Email account awaits confirmation**: disable **Confirm email** in Supabase Authentication → Sign In / Providers. If a test account was created before switching it off, that account may still need confirmation in Supabase; new signups use the new setting.
 - **Login returns without signing in**: use the same browser throughout the flow. A PKCE verifier is stored by that browser. Start a fresh sign-in if the callback link is old or already used.
 - **Paddock temporarily unavailable**: check the migration ran, the project is awake, and Cloudflare's URL/key point to that same project. Check browser console/network errors for the detailed connection error.
-- **Race control missing**: check your UID in `private.admin_users`, then reload. Editing profile metadata cannot grant admin access.
+- **Admin Panel missing**: check your UID in `private.admin_users` or `private.developer_users`, then reload. Editing profile metadata cannot grant admin access.
 - **Image upload rejected**: use PNG/JPEG/WebP under 5 MB and check the `driver-media` bucket and its policies exist.
 - **Country rejected**: choose a complete country name or its two-letter code from the supplied country list.
 - **A track cannot be removed**: it is referenced by lap submissions or events. Edit it to preserve those records.
