@@ -1,3 +1,5 @@
+> The newer ACCOUNT-UPDATE.md supersedes the account, privacy and deletion details in this guide.
+
 # FRA racing tools and motion update
 
 This update includes the complete modern redesign plus creator ordering/avatars, Map Developer and manual badges, named qualifying/race sessions, device clip uploads, page/profile transitions, the ignition loading screen, F1-style headline sparks and the improved Prevalent wheels/lights.
@@ -8,7 +10,7 @@ This update includes the complete modern redesign plus creator ordering/avatars,
 2. Drag the files and folders inside the extracted folder together onto **ArhaanSayed7/fra → Add file → Upload files**. Preserve the nested folders and replace matching files. Do not upload the ZIP itself or put everything inside an extra outer folder.
 3. Commit to **main**. Wait for Cloudflare Pages to finish its automatic deployment, then refresh the website without cache if needed.
 
-All five database migrations, including the new racing tools, are already applied to your existing FRA Supabase project. The creator-avatar and private lap-clip storage buckets are ready. **Do not run SQL again.** No new environment variables, email settings or Discord configuration are needed. The frontend must still be uploaded to make these controls available on the live site.
+All six database migrations, including the new racing tools, are already applied to your existing FRA Supabase project. The creator-avatar and private lap-clip storage buckets are ready. **Do not run SQL again.** No new environment variables, email settings or Discord configuration are needed. The frontend must still be uploaded to make these controls available on the live site.
 
 ## Track developer order and avatars
 
@@ -37,7 +39,7 @@ Public event pages show each named session under the Qualifying/Race toggle. Exi
 
 On **Submit Lap**, choose **Upload clip** and select an **MP4, WebM or MOV up to 50 MB** from your computer/gallery. Complete the setup and lap time, confirm the lap is complete, and submit for review. Use **Video link** for larger files.
 
-The upload stays private while pending/rejected: its driver and website admins can view it. After approval, viewers can open its proof from the leaderboard using an expiring signed link. Moderators see a video player in the review dialog. An Open clip link is available if the browser cannot play a particular MOV codec. A failed lap save attempts to remove its unused uploaded clip. Submitted proof cannot be deleted by the driver through the storage API.
+The upload stays private to its submitting driver and website admins, including after approval. Public leaderboard proof links have been removed; external proof URLs and object paths are now stored privately. Moderators see a video player in the review dialog. An Open clip link is available if the browser cannot play a particular MOV codec. A failed lap save attempts to remove its unused uploaded clip. Submitted proof cannot be deleted by the driver through the storage API.
 
 ## Motion and car
 
@@ -49,6 +51,6 @@ The supplied Prevalent retains its holographic body, sits slightly lower, and no
 
 Keep build **npm run build**, output **dist**, root blank and the existing public Supabase settings. Upload **dist/_headers** as well: it permits uploaded video playback while preserving the car’s blob texture support.
 
-All **24 automated checks pass**, covering the original permissions/auth/leaderboard rules plus session validation and atomic saves, multiple lobbies, creator ordering, manual badge permissions and private uploaded proof. The production build succeeds. Desktop and mobile previews were checked with isolated sample data. A synthetic local clip was submitted and opened in the review player without creating a real submission or uploading test media to production. The Supabase security advisor has no new warnings from this update.
+All **31 automated checks pass**, covering the original permissions/auth/leaderboard rules plus session validation and atomic saves, multiple lobbies, creator ordering, manual badge permissions and private uploaded proof. The production build succeeds. Desktop and mobile previews were checked with isolated sample data. A synthetic local clip was submitted and opened in the review player without creating a real submission or uploading test media to production. The Supabase security advisor has no new warnings from this update.
 
-Fresh installations on a different Supabase project should follow **SETUP.md** and run all five migrations in order. The existing FRA project is already updated.
+Fresh installations on a different Supabase project should follow **SETUP.md** and run all six migrations in order. The existing FRA project is already updated.

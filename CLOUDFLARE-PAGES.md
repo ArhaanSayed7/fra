@@ -17,7 +17,7 @@ Connect the repository to a Cloudflare **Pages** project with:
 
 Set the public Supabase build variables shown in **YOUR-FRA-SETUP.md** for Production. Keep the entire `dist` directory in Git, including `index.html`, `styles.css`, `modern.css`, `_headers` and all assets. The build regenerates `app.js` and `config.js`. Any change to build variables takes effect on the next deployment.
 
-The existing FRA database and login settings are ready. Fresh installations on another Supabase project must follow **SETUP.md**, including all five migrations and the correct OAuth return URLs. Do not run the migrations again on the existing FRA project.
+The existing FRA database and login settings are ready. Fresh installations on another Supabase project must follow **SETUP.md**, including all six migrations and the correct OAuth return URLs. Do not run the migrations again on the existing FRA project.
 
 For login at a new domain, set Supabase’s Site URL and exact allowed Redirect URL to the final website root with a trailing slash. Discord’s OAuth callback remains the Supabase `/auth/v1/callback` URL. Use a separate development database for previews that need to write test data.
 

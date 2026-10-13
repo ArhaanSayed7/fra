@@ -1,4 +1,5 @@
 import { countries, flag } from "./countries.js";
+import { enhanceLapInput } from "./lap-input.js";
 let sequence = 0;
 const chevron =
   '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5"/></svg>';
@@ -342,6 +343,7 @@ function enhanceSuggestions(input) {
   );
 }
 export function enhanceControls(root = document) {
+  root.querySelectorAll("input[data-lap-mask]").forEach(enhanceLapInput);
   root.querySelectorAll("select").forEach(enhanceSelect);
   root.querySelectorAll("input[list]").forEach(enhanceSuggestions);
 }

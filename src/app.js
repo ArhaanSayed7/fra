@@ -156,7 +156,7 @@ function home() {
     )
     .sort((a, b) => a.ms - b.ms)
     .slice(0, 3);
-  return `<section class="hero"><div class="hero-top"><span class="hero-pill"><i class="live-dot"></i>COMMUNITY BUILT. RACE READY.</span><span class="tiny muted">FORTNITE RACING ASSOCIATION</span></div><svg class="effect-defs" aria-hidden="true"><defs><filter id="liquid-ink"><feTurbulence type="fractalNoise" baseFrequency=".024 .055" numOctaves="2" seed="7" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="13" xChannelSelector="R" yChannelSelector="G"/></filter></defs></svg><h1 class="hero-title"><span class="title-line">FIND YOUR</span><span class="title-line accent">LIMIT.</span><span class="ink-layer" aria-hidden="true"><span>FIND YOUR</span><span>LIMIT.</span></span></h1><div class="hero-aura" aria-hidden="true"></div><div class="orbit" aria-hidden="true"></div><div class="car-stage" aria-label="Interactive 3D Prevalent car. Move your pointer or drag to rotate."><div class="load-state tiny">LOADING THE PREVALENT…</div></div><div class="hero-bottom"><div class="hero-copy"><p>A better line. A faster lap. Your next great race.<br> Welcome to the home of Fortnite racing.</p><div class="hero-controls"><a class="button" href="#events">EXPLORE EVENTS ${arrow}</a><a class="text-button" href="#time-trials">Time trials ${arrow}</a></div></div><div class="hero-status"><span class="tiny muted">YOUR GRID IS WAITING</span><div><strong>${db.drivers.filter((d) => d.complete !== false).length}<small>Drivers</small></strong><strong>${db.tracks.length}<small>Circuits</small></strong></div><button id="motion" class="motion-control" aria-pressed="false">Ⅱ Pause motion</button></div></div></section><div class="ticker" aria-hidden="true"><div class="ticker-inner">${Array.from({ length: 4 }, () => "<span>RACE TOGETHER</span><b>✦</b><span>CHASE THE CLOCK</span><b>✦</b><span>FIND YOUR LIMIT</span><b>✦</b>").join("")}</div></div><section class="section"><div class="section-head"><div><div class="eyebrow">THE RACE CALENDAR</div><h2>NEXT ON THE GRID.</h2></div><a class="text-button" href="#events">ALL EVENTS ${arrow}</a></div><div class="event-grid">${
+  return `<section class="hero"><div class="hero-top"><span class="hero-pill"><i class="live-dot"></i>COMMUNITY BUILT. RACE READY.</span><span class="tiny muted">FORTNITE RACING ASSOCIATION</span></div><svg class="effect-defs" aria-hidden="true"><defs><filter id="liquid-ink"><feTurbulence type="fractalNoise" baseFrequency=".024 .055" numOctaves="2" seed="7" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="13" xChannelSelector="R" yChannelSelector="G"/></filter></defs></svg><h1 class="hero-title racing-title"><span class="title-line">HOME OF</span><span class="title-line accent">FORTNITE RACING</span><span class="ink-layer" aria-hidden="true"><span>HOME OF</span><span>FORTNITE RACING</span></span></h1><div class="hero-aura" aria-hidden="true"></div><div class="orbit" aria-hidden="true"></div><div class="car-stage" aria-label="Interactive 3D Prevalent car. Move your pointer or drag to rotate."><div class="load-state tiny">LOADING THE PREVALENT…</div></div><div class="hero-bottom"><div class="hero-copy"><p>A better line. A faster lap. Your next great race.<br> Welcome to the home of Fortnite racing.</p><div class="hero-controls"><a class="button" href="#events">EXPLORE EVENTS ${arrow}</a><a class="text-button" href="#time-trials">Time trials ${arrow}</a></div></div><div class="hero-status"><span class="tiny muted">YOUR GRID IS WAITING</span><div><strong>${db.drivers.filter((d) => d.complete !== false).length}<small>Drivers</small></strong><strong>${db.tracks.length}<small>Circuits</small></strong></div><button id="motion" class="motion-control" aria-pressed="false">Ⅱ Pause motion</button></div></div></section><div class="ticker" aria-hidden="true"><div class="ticker-inner">${Array.from({ length: 4 }, () => "<span>RACE TOGETHER</span><b>✦</b><span>CHASE THE CLOCK</span><b>✦</b><span>FIND YOUR LIMIT</span><b>✦</b>").join("")}</div></div><section class="section"><div class="section-head"><div><div class="eyebrow">THE RACE CALENDAR</div><h2>NEXT ON THE GRID.</h2></div><a class="text-button" href="#events">ALL EVENTS ${arrow}</a></div><div class="event-grid">${
     db.events
       .filter((x) => x.status === "upcoming")
       .slice(0, 3)
@@ -308,7 +308,7 @@ function board() {
           "All tires",
         )}</select></label>`
       : ""
-  }${f.car === "Customs" ? `<label>CUSTOM CAR<input id="custom-filter" placeholder="Filter custom car…" value="${e(f.custom)}"></label>` : ""}</div>${setup.selected ? `<p class="track-setup-note">TRACK SETUP <span>${e([!setup.showWeather ? setup.weather[0] : "", !setup.showCars ? setup.cars[0] : "", !setup.selected.hasTires ? "No tires" : !setup.showTires ? setup.tires[0] : ""].filter(Boolean).join(" · ") || "Choose your conditions above")}</span></p>` : ""}<p class="helper">Rankings are per track, weather, car and tire compound. Filter your setup to compare like-for-like laps.</p><div class="table-wrap"><table><thead><tr><th>Position</th><th>Driver</th><th>Track</th><th>Conditions</th><th>Car</th><th>Tires</th><th>Best lap</th><th>Proof</th></tr></thead><tbody>${
+  }${f.car === "Customs" ? `<label>CUSTOM CAR<input id="custom-filter" placeholder="Filter custom car…" value="${e(f.custom)}"></label>` : ""}</div>${setup.selected ? `<p class="track-setup-note">TRACK SETUP <span>${e([!setup.showWeather ? setup.weather[0] : "", !setup.showCars ? setup.cars[0] : "", !setup.selected.hasTires ? "No tires" : !setup.showTires ? setup.tires[0] : ""].filter(Boolean).join(" · ") || "Choose your conditions above")}</span></p>` : ""}<p class="helper">Rankings are per track, weather, car and tire compound. Filter your setup to compare like-for-like laps.</p><div class="table-wrap"><table><thead><tr><th>Position</th><th>Driver</th><th>Track</th><th>Conditions</th><th>Car</th><th>Tires</th><th>Best lap</th></tr></thead><tbody>${
     records
       .map((l) => {
         let group = records.filter(
@@ -320,10 +320,10 @@ function board() {
             (r.tire || "") === (l.tire || ""),
         );
         let rank = group.findIndex((r) => r.id === l.id) + 1;
-        return `<tr><td class="number ${rank === 1 ? "yellow" : ""}">${String(rank).padStart(2, "0")}</td><td>${driverCell(driver(l.driver))}</td><td>${e(track(l.track)?.name)}</td><td>${e(l.weather)}</td><td>${e(l.custom || l.car)}</td><td>${e(tireLabel(l))}</td><td class="lap yellow">${formatLap(l.ms)}</td><td>${l.sample ? '<span class="muted">Sample</span>' : `<button class="text-button" data-action="proof" data-id="${e(l.id)}">WATCH ↗</button>`}</td></tr>`;
+        return `<tr><td class="number ${rank === 1 ? "yellow" : ""}">${String(rank).padStart(2, "0")}</td><td>${driverCell(driver(l.driver))}</td><td>${e(track(l.track)?.name)}</td><td>${e(l.weather)}</td><td>${e(l.custom || l.car)}</td><td>${e(tireLabel(l))}</td><td class="lap yellow">${formatLap(l.ms)}</td></tr>`;
       })
       .join("") ||
-    '<tr><td colspan="8" class="empty">A clean slate. No approved laps match these filters yet.</td></tr>'
+    '<tr><td colspan="7" class="empty">A clean slate. No approved laps match these filters yet.</td></tr>'
   }</tbody></table></div>`;
 }
 function tireLabel(l) {
@@ -349,7 +349,7 @@ function recordForTrack(t) {
 }
 function lapRecord(t, compact = false) {
   const record = recordForTrack(t);
-  return `<div class="lap-record ${compact ? "compact" : ""}"><div class="eyebrow">LAP RECORD</div>${record ? `<div class="record-main"><strong>${formatLap(record.ms)}</strong>${driverCell(driver(record.driver))}</div><p class="helper">${e(record.weather)} · ${e(record.custom || record.car)} · ${e(tireLabel(record))}${record.sample ? " · Sample record" : ""}</p>${compact ? "" : `<p class="helper">Fastest approved lap across all setups. ${date(record.date)}.</p>${record.sample ? "" : `<button class="text-button" data-action="proof" data-id="${e(record.id)}">WATCH RECORD LAP ↗</button>`}`}` : '<strong class="no-record">Be the first to set the record.</strong><p class="helper">Your fastest approved lap will appear here.</p>'}</div>`;
+  return `<div class="lap-record ${compact ? "compact" : ""}"><div class="eyebrow">LAP RECORD</div>${record ? `<div class="record-main"><strong>${formatLap(record.ms)}</strong>${driverCell(driver(record.driver))}</div><p class="helper">${e(record.weather)} · ${e(record.custom || record.car)} · ${e(tireLabel(record))}${record.sample ? " · Sample record" : ""}</p>${compact ? "" : `<p class="helper">Fastest approved lap across all setups. ${date(record.date)}.</p>`}` : '<strong class="no-record">Be the first to set the record.</strong><p class="helper">Your fastest approved lap will appear here.</p>'}</div>`;
 }
 function trackCard(t) {
   const record = recordForTrack(t);
@@ -375,11 +375,11 @@ function trackDirectory() {
           expanded = expandedCreators.has(c.id),
           gridId = `creator-tracks-${index}`;
         return `<section class="creator-tracks"><div class="creator-header"><div class="creator-title">${creatorAvatar(c)}<div><h3>${e(c.name)}</h3><p>${e(c.description)}</p></div></div>${adminPreview ? `<button class="outline" data-action="add-track" data-id="${e(c.id)}">+ ADD TRACK</button>` : ""}</div><div class="track-grid" id="${gridId}">${
-            tracks
-              .slice(0, expanded ? tracks.length : 4)
-              .map(trackCard)
-              .join("") || '<div class="empty">No tracks yet.</div>'
-          }</div>${tracks.length > 4 ? `<div class="track-expand"><button class="outline" data-action="toggle-creator-tracks" data-id="${e(c.id)}" aria-controls="${gridId}" aria-expanded="${expanded}">${expanded ? "Show less" : `Show more (${tracks.length - 4})`}</button></div>` : ""}</section>`;
+          tracks
+            .slice(0, expanded ? tracks.length : 4)
+            .map(trackCard)
+            .join("") || '<div class="empty">No tracks yet.</div>'
+        }</div>${tracks.length > 4 ? `<div class="track-expand"><button class="outline" data-action="toggle-creator-tracks" data-id="${e(c.id)}" aria-controls="${gridId}" aria-expanded="${expanded}">${expanded ? "Show less" : `Show more (${tracks.length - 4})`}</button></div>` : ""}</section>`;
       })
       .join("") ||
     '<div class="empty">The circuit directory is on its way.</div>'
@@ -409,7 +409,7 @@ function submitPage(id) {
     return accountPage("Complete your driver profile to submit a lap.");
   let t = track(id) || db.tracks[0];
   let unavailable = !t || !db.drivers.length;
-  return `<section class="page">${pageHeading("PUT YOUR LAP ON THE BOARD", "MAKE YOUR MARK.", "A clean lap. The right conditions. Video proof. Show the grid what you’ve got.")}${notice()}${
+  return `<section class="page">${pageHeading("PUT YOUR LAP ON THE BOARD", "SUBMIT YOUR LAP.", "A clean lap. The right conditions. Video proof. Show the grid what you’ve got.")}${notice()}${
     unavailable
       ? '<div class="empty">There are no tracks available for submissions yet.</div>'
       : `<div class="form-layout"><form id="lap-form" class="form-panel"><h3>LAP SUBMISSION</h3><p class="helper" style="margin-bottom:25px">${demo ? "Design preview · Choose a sample driver to test the flow." : "Submitting as " + e(currentDriver()?.name) + ". Your lap goes to the Admin Panel for review."}</p><div class="form-grid"><div class="field full"><label for="lap-driver">DRIVER</label><select id="lap-driver" name="driver" required>${options((demo ? db.drivers : [currentDriver()]).map((d) => [d.id, d.name]))}</select></div><div class="field"><label for="lap-creator">TRACK CREATOR</label><select id="lap-creator" name="creator" required>${options(
@@ -420,7 +420,7 @@ function submitPage(id) {
             .filter((x) => x.creator === t.creator)
             .map((x) => [x.id, x.name]),
           t.id,
-        )}</select></div><div class="field"><label for="lap-weather">WEATHER CONDITIONS</label><select id="lap-weather" name="weather" required>${options(t.weather)}</select></div><div class="field"><label for="lap-car">CAR CLASS</label><select id="lap-car" name="car" required>${options(t.cars)}</select></div><div class="field ${t.hasTires ? "" : "hidden"}" id="tire-field"><label for="lap-tire">TIRE COMPOUND</label><select id="lap-tire" name="tire" ${t.hasTires ? "required" : "disabled"}>${options(t.tires, "", "Select a tire compound")}</select><small>Only compounds available on this track can be used.</small></div><div class="field full ${t.cars[0] === "Customs" ? "" : "hidden"}" id="custom-field"><label for="lap-custom">CUSTOM CAR</label><input id="lap-custom" name="custom" list="custom-cars" placeholder="Type the exact car name…" maxlength="80"><datalist id="custom-cars">${[...new Set(db.laps.map((l) => l.custom).filter(Boolean))].map((c) => `<option value="${e(c)}">`).join("")}</datalist><small>Type your car name. The official custom car list can be added later.</small></div><div class="field full"><label for="lap-time">LAP TIME</label><input id="lap-time" name="time" placeholder="1:42.381" pattern="[0-9]{1,2}:[0-5][0-9]\\.[0-9]{3}" required inputmode="decimal"><small>Use M:SS.mmm — minutes, seconds, milliseconds.</small></div><fieldset class="field full proof-picker"><legend class="label">LAP VIDEO · REQUIRED</legend><div class="proof-modes"><label><input type="radio" name="proofMode" value="link" checked> Video link</label><label><input type="radio" name="proofMode" value="upload"> Upload clip</label></div><div id="proof-link-field"><label for="lap-proof">VIDEO LINK</label><input id="lap-proof" name="proof" type="url" placeholder="https://youtube.com/watch?v=…" required><small>Link a viewable, complete lap with the timer visible.</small></div><div id="proof-upload-field" hidden><label for="lap-clip">CHOOSE FROM YOUR DEVICE</label><input id="lap-clip" name="clipFile" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" disabled><small>MP4, WebM or MOV · up to 50 MB. For larger clips, use a video link.</small></div><p class="helper" id="clip-status" role="status"></p></fieldset><div class="checks full"><label><input type="checkbox" name="confirm" required> I confirm this is a complete, unedited lap.</label></div><p id="lap-error" class="error full" role="alert"></p><button class="button full" type="submit">SUBMIT FOR REVIEW ${arrow}</button></div></form><aside><div class="track-card"><div class="track-visual"><img id="submit-image" src="${image(t)}" alt="Selected track concept"></div><div class="event-content"><span class="tiny yellow">YOUR SELECTED CIRCUIT</span><h3 id="submit-track-name" style="margin-top:15px">${e(t.name)}</h3><p id="submit-track-desc">${e(t.description)}</p></div></div><div class="rule"><b>01</b><div><strong>Match your setup</strong>Track, weather, car and tire compound must match the conditions in your video.</div></div><div class="rule"><b>02</b><div><strong>Keep it clean</strong>Record the complete lap with the timer and track visible.</div></div><div class="rule"><b>03</b><div><strong>Wait for the green light</strong>An admin reviews your proof before your best lap reaches the board.</div></div></aside></div>`
+        )}</select></div><div class="field"><label for="lap-weather">WEATHER CONDITIONS</label><select id="lap-weather" name="weather" required>${options(t.weather)}</select></div><div class="field"><label for="lap-car">CAR CLASS</label><select id="lap-car" name="car" required>${options(t.cars)}</select></div><div class="field ${t.hasTires ? "" : "hidden"}" id="tire-field"><label for="lap-tire">TIRE COMPOUND</label><select id="lap-tire" name="tire" ${t.hasTires ? "required" : "disabled"}>${options(t.tires, "", "Select a tire compound")}</select><small>Only compounds available on this track can be used.</small></div><div class="field full ${t.cars[0] === "Customs" ? "" : "hidden"}" id="custom-field"><label for="lap-custom">CUSTOM CAR</label><input id="lap-custom" name="custom" list="custom-cars" placeholder="Type the exact car name…" maxlength="80"><datalist id="custom-cars">${[...new Set(db.laps.map((l) => l.custom).filter(Boolean))].map((c) => `<option value="${e(c)}">`).join("")}</datalist><small>Type your car name. The official custom car list can be added later.</small></div><div class="field full"><label for="lap-time">LAP TIME</label><input id="lap-time" name="time" placeholder="1:42.381" pattern="[0-9]{1,2}:[0-5][0-9]\\.[0-9]{3}" required inputmode="numeric" data-lap-mask autocomplete="off" spellcheck="false"><small>Type the numbers only — : and . are added automatically. Example: 142381 becomes 1:42.381.</small></div><fieldset class="field full proof-picker"><legend class="label">LAP VIDEO · REQUIRED</legend><div class="proof-modes"><label><input type="radio" name="proofMode" value="link" checked> Video link</label><label><input type="radio" name="proofMode" value="upload"> Upload clip</label></div><div id="proof-link-field"><label for="lap-proof">VIDEO LINK</label><input id="lap-proof" name="proof" type="url" placeholder="https://youtube.com/watch?v=…" required><small>Link a viewable, complete lap with the timer visible.</small></div><div id="proof-upload-field" hidden><label for="lap-clip">CHOOSE FROM YOUR DEVICE</label><input id="lap-clip" name="clipFile" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" disabled><small>MP4, WebM or MOV · up to 50 MB. For larger clips, use a video link.</small></div><p class="helper" id="clip-status" role="status"></p></fieldset><div class="checks full"><label><input type="checkbox" name="confirm" required> I confirm this is a complete, unedited lap.</label></div><p id="lap-error" class="error full" role="alert"></p><button class="button full" type="submit">SUBMIT FOR REVIEW ${arrow}</button></div></form><aside><div class="track-card"><div class="track-visual"><img id="submit-image" src="${image(t)}" alt="Selected track concept"></div><div class="event-content"><span class="tiny yellow">YOUR SELECTED CIRCUIT</span><h3 id="submit-track-name" style="margin-top:15px">${e(t.name)}</h3><p id="submit-track-desc">${e(t.description)}</p></div></div><div class="rule"><b>01</b><div><strong>Match your setup</strong>Track, weather, car and tire compound must match the conditions in your video.</div></div><div class="rule"><b>02</b><div><strong>Keep it clean</strong>Record the complete lap with the timer and track visible.</div></div><div class="rule"><b>03</b><div><strong>Wait for the green light</strong>An admin reviews your proof before your best lap reaches the board.</div></div></aside></div>`
   }</section>`;
 }
 function admin() {
@@ -468,7 +468,7 @@ function adminContent() {
       driverCell(d),
       e(d.country),
       date(d.registered),
-      `<button class="text-button" data-action="edit-driver" data-id="${e(d.id)}">Edit ↗</button> <button class="text-button" data-action="edit-badges" data-id="${e(d.id)}">Badges ↗</button> ${demo ? `<button class="text-button danger" data-action="delete-driver" data-id="${e(d.id)}">Remove</button>` : `<span class="pill">${d.active ? "Active" : "Inactive"}</span>`}`,
+      `<button class="text-button" data-action="edit-driver" data-id="${e(d.id)}">Edit ↗</button> <button class="text-button" data-action="edit-badges" data-id="${e(d.id)}">Badges ↗</button> ${roleFor(db, d.id) !== "developer" && d.id !== backend.identity.user?.id && (backend.identity.developer || roleFor(db, d.id) !== "admin") ? `<button class="text-button danger" data-action="delete-driver" data-id="${e(d.id)}">Delete</button>` : ""} <span class="pill">${d.active ? "Active" : "Inactive"}</span>`,
     ]);
   }
   if (adminTab === "events") {
@@ -537,6 +537,13 @@ function render(scroll = false) {
   cleanCar = () => {};
   let [page = "home", id] = (location.hash.slice(1) || "home").split("/");
   if (!canAdmin()) adminPreview = false;
+  if (
+    !loading &&
+    !loadError &&
+    backend.identity.user &&
+    currentDriver()?.complete === false
+  )
+    page = "account";
   chrome(page);
   app.innerHTML = loading
     ? statusPage("CONNECTING TO THE PADDOCK.", "Loading the grid…")
@@ -569,7 +576,7 @@ function render(scroll = false) {
                           : page === "admin"
                             ? admin()
                             : notFound();
-  document.title = `${{ home: "Find your limit.", events: "Events", history: "Event history", drivers: "Driverbase", tracks: "Tracks", track: "Track details", "time-trials": "Time trials", submit: "Submit a lap", account: "My profile", admin: "Admin Panel", event: "Event details" }[page] || "Paddock"} — Fortnite Racing Association`;
+  document.title = `${{ home: "Home of Fortnite Racing", events: "Events", history: "Event history", drivers: "Driverbase", tracks: "Tracks", track: "Track details", "time-trials": "Time trials", submit: "Submit a lap", account: "My profile", admin: "Admin Panel", event: "Event details" }[page] || "Paddock"} — Fortnite Racing Association`;
   enhanceControls(app);
   pageTransition(app, page, scroll);
   if (!loading) finishBoot(!loadError);
@@ -755,13 +762,19 @@ function deletion(kind, id) {
     toast("This track is used by events or lap records. Edit it instead.");
     return;
   }
-  if (
-    kind === "driver" &&
-    (db.laps.some((l) => l.driver === id) ||
-      db.events.some((v) => v.results?.some((r) => r.driver === id)))
-  ) {
-    toast(
-      "This driver has results. Edit their profile to preserve the history.",
+  if (kind === "driver") {
+    if (
+      !obj ||
+      roleFor(db, id) === "developer" ||
+      id === backend.identity.user?.id ||
+      (!backend.identity.developer && roleFor(db, id) === "admin")
+    ) {
+      toast("This account is protected.");
+      return;
+    }
+    showModal(
+      "PERMANENTLY DELETE DRIVER",
+      `<p class="body-copy">Delete <strong>${e(obj.name)}</strong> and their sign-in account, profile, event entries, results, lap submissions and uploaded media? This cannot be undone.</p><form id="delete-driver-form" data-id="${e(id)}">${field("confirmation", "TYPE THE DRIVER’S USERNAME TO CONFIRM", "", "text", true, 'autocomplete="off" spellcheck="false"')}<p id="delete-driver-error" class="error" role="alert"></p><div class="form-actions"><button class="outline" type="button" data-action="close">CANCEL</button><button class="button" type="submit">DELETE DRIVER PERMANENTLY</button></div></form>`,
     );
     return;
   }
@@ -862,14 +875,14 @@ function accountPage(message = "") {
   const d = currentDriver();
   if (!backend.identity.user) {
     const registering = authMode === "register";
-    return `<section class="page">${pageHeading("YOUR PLACE ON THE GRID", "JOIN THE FRA PADDOCK.", message || "One driver profile. Every event. Every lap.")}<div class="form-panel account-signin"><img src="assets/fra-logo.png" alt="FRA" width="80"><h3>${registering ? "CREATE YOUR ACCOUNT." : "WELCOME TO THE PADDOCK."}</h3><p class="body-copy">${registering ? "Create an account with your email and password, then choose your driver name and country." : "Sign in with your email and password or continue with Discord."}</p><div class="auth-switch" role="group" aria-label="Account action"><button type="button" data-action="auth-mode" data-mode="login" aria-pressed="${!registering}" class="${!registering ? "selected" : ""}">SIGN IN</button><button type="button" data-action="auth-mode" data-mode="register" aria-pressed="${registering}" class="${registering ? "selected" : ""}">CREATE ACCOUNT</button></div><form id="email-auth-form" data-mode="${authMode}" class="auth-form">${field("email", "EMAIL ADDRESS", authEmail, "email", true, 'autocomplete="email" maxlength="254" autocapitalize="none" spellcheck="false"')}${field("password", "PASSWORD", "", "password", true, registering ? 'autocomplete="new-password" minlength="8" maxlength="128"' : 'autocomplete="current-password"')}${registering ? '<small class="muted">At least 8 characters.</small>' : ""}<p id="account-error" class="error" role="alert"></p><p class="auth-notice" role="status">${e(authNotice)}</p><button class="button" type="submit" ${!live ? "disabled" : ""}>${registering ? "CREATE ACCOUNT" : "SIGN IN"} ↗</button></form><div class="auth-divider"><span>OR</span></div><button class="outline auth-discord" data-action="discord" ${!live ? "disabled" : ""}>CONTINUE WITH DISCORD ↗</button>${!live ? `<p class="helper">${demo ? "Account sign-in is unavailable in this design preview." : "Driver registration is opening soon."}</p>` : ""}</div></section>`;
+    return `<section class="page">${pageHeading("YOUR PLACE ON THE GRID", "JOIN THE FRA PADDOCK.", message || "One driver profile. Every event. Every lap.")}<div class="form-panel account-signin"><img src="assets/fra-logo.png" alt="FRA" width="80"><h3>${registering ? "CREATE YOUR ACCOUNT." : "WELCOME TO THE PADDOCK."}</h3><p class="body-copy">${registering ? "Choose your username and country, then create your account with email and password." : "Sign in with your email and password or continue with Discord."}</p><div class="auth-switch" role="group" aria-label="Account action"><button type="button" data-action="auth-mode" data-mode="login" aria-pressed="${!registering}" class="${!registering ? "selected" : ""}">SIGN IN</button><button type="button" data-action="auth-mode" data-mode="register" aria-pressed="${registering}" class="${registering ? "selected" : ""}">CREATE ACCOUNT</button></div><form id="email-auth-form" data-mode="${authMode}" class="auth-form">${field("email", "EMAIL ADDRESS", authEmail, "email", true, 'autocomplete="email" maxlength="254" autocapitalize="none" spellcheck="false"')}${field("password", "PASSWORD", "", "password", true, registering ? 'autocomplete="new-password" minlength="8" maxlength="128"' : 'autocomplete="current-password"')}${registering ? `<small class="muted">At least 8 characters.</small>${field("username", "USERNAME", "", "text", true, 'minlength="3" maxlength="32" autocomplete="nickname"')}${countryField("")}` : ""}<p id="account-error" class="error" role="alert"></p><p class="auth-notice" role="status">${e(authNotice)}</p><button class="button" type="submit" ${!live ? "disabled" : ""}>${registering ? "CREATE ACCOUNT" : "SIGN IN"} ↗</button></form><div class="auth-divider"><span>OR</span></div><button class="outline auth-discord" data-action="discord" ${!live ? "disabled" : ""}>CONTINUE WITH DISCORD ↗</button>${!live ? `<p class="helper">${demo ? "Account sign-in is unavailable in this design preview." : "Driver registration is opening soon."}</p>` : ""}</div></section>`;
   }
   if (!d)
     return statusPage(
       "YOUR DRIVER PROFILE IS NOT READY.",
       "Please contact FRA the Admin Panel.",
     );
-  return `<section class="page">${pageHeading("YOUR DRIVER PROFILE", d.complete ? "WELCOME BACK, " + e(d.name).toUpperCase() + "." : "TAKE YOUR PLACE.", message || "Make the grid your own. Your account keeps your events and lap times together.", '<button class="outline" data-action="signout">SIGN OUT ↗</button>')}${d.active ? "" : '<div class="notice">Your driver account is inactive. Contact the Admin Panel to enter events or submit laps.</div>'}<div class="form-layout"><form id="profile-form" class="form-panel"><h3>${d.complete ? "EDIT YOUR PROFILE" : "COMPLETE REGISTRATION"}</h3><div class="form-grid">${field("name", "DRIVER NAME", d.complete ? d.name : "", "text", true, 'minlength="3" maxlength="32" autocomplete="nickname"')}${countryField(d.country)}${field("number", "RACE NUMBER · OPTIONAL", d.number, "text", false, 'pattern="[0-9]{0,3}" maxlength="3"')}<div class="field"><label for="profile-avatar">PROFILE PICTURE</label><input id="profile-avatar" name="avatarFile" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG or WebP · up to 5 MB. A Discord picture is used when available.</small></div><div class="field full"><label for="profile-banner">BANNER · OPTIONAL</label><input id="profile-banner" name="bannerFile" type="file" accept="image/png,image/jpeg,image/webp"><small>16:9 recommended · up to 5 MB.</small>${d.banner ? '<label class="checks"><input type="checkbox" name="removeBanner"> Remove current banner</label>' : ""}</div><div class="field full"><label for="profile-bio">BIO · OPTIONAL</label><textarea id="profile-bio" name="bio" maxlength="500">${e(d.bio)}</textarea></div><p id="profile-error" class="error full" role="alert"></p><button class="button full" type="submit">${d.complete ? "SAVE PROFILE" : "FINISH REGISTRATION"} ↗</button></div></form><aside><div class="profile-preview">${cover(d)}<div class="profile-preview-body"><div class="profile-hero">${avatar(d)}<div><h3>${e(d.complete ? d.name : "YOUR DRIVER NAME")}</h3><p>${e(d.flag)} ${e(d.country)}</p></div></div>${badges(d.id)}<button class="outline" data-action="profile" data-id="${e(d.id)}">VIEW DRIVER PROFILE ↗</button></div></div>${backend.identity.user.email ? `<form id="password-form" class="form-panel password-settings"><h3>EMAIL SIGN-IN</h3><p class="helper">${e(backend.identity.user.email)}</p><p class="body-copy">Set or update a password to sign in with this email.</p>${field("newPassword", "NEW PASSWORD", "", "password", true, 'autocomplete="new-password" minlength="8" maxlength="128"')}<small class="muted">At least 8 characters.</small><p id="password-error" class="error" role="alert"></p><button class="outline" type="submit">SAVE PASSWORD ↗</button></form>` : ""}<div class="rule"><b>01</b><div><strong>Your events</strong>${
+  return `<section class="page">${pageHeading("YOUR DRIVER PROFILE", d.complete ? "WELCOME BACK, " + e(d.name).toUpperCase() + "." : "TAKE YOUR PLACE.", message || "Make the grid your own. Your account keeps your events and lap times together.", '<button class="outline" data-action="signout">SIGN OUT ↗</button>')}${d.active ? "" : '<div class="notice">Your driver account is inactive. Contact the Admin Panel to enter events or submit laps.</div>'}<div class="form-layout"><form id="profile-form" class="form-panel"><h3>${d.complete ? "EDIT YOUR PROFILE" : "COMPLETE REGISTRATION"}</h3><div class="form-grid">${field("name", "USERNAME", d.complete ? d.name : "", "text", true, 'minlength="3" maxlength="32" autocomplete="nickname"')}${countryField(d.country)}${field("number", "RACE NUMBER · OPTIONAL", d.number, "text", false, 'pattern="[0-9]{0,3}" maxlength="3"')}<div class="field"><label for="profile-avatar">PROFILE PICTURE</label><input id="profile-avatar" name="avatarFile" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG or WebP · up to 5 MB. A Discord picture is used when available.</small></div><div class="field full"><label for="profile-banner">BANNER · OPTIONAL</label><input id="profile-banner" name="bannerFile" type="file" accept="image/png,image/jpeg,image/webp"><small>16:9 recommended · up to 5 MB.</small>${d.banner ? '<label class="checks"><input type="checkbox" name="removeBanner"> Remove current banner</label>' : ""}</div><div class="field full"><label for="profile-bio">BIO · OPTIONAL</label><textarea id="profile-bio" name="bio" maxlength="500">${e(d.bio)}</textarea></div><p id="profile-error" class="error full" role="alert"></p><button class="button full" type="submit">${d.complete ? "SAVE PROFILE" : "FINISH REGISTRATION"} ↗</button></div></form><aside><div class="profile-preview">${cover(d)}<div class="profile-preview-body"><div class="profile-hero">${avatar(d)}<div><h3>${e(d.complete ? d.name : "YOUR DRIVER NAME")}</h3><p>${e(d.flag)} ${e(d.country)}</p></div></div>${badges(d.id)}<button class="outline" data-action="profile" data-id="${e(d.id)}">VIEW DRIVER PROFILE ↗</button></div></div>${backend.identity.user.email ? `<form id="password-form" class="form-panel password-settings"><h3>EMAIL SIGN-IN</h3><p class="helper">${e(backend.identity.user.email)}</p><p class="body-copy">Set or update a password to sign in with this email.</p>${field("newPassword", "NEW PASSWORD", "", "password", true, 'autocomplete="new-password" minlength="8" maxlength="128"')}<small class="muted">At least 8 characters.</small><p id="password-error" class="error" role="alert"></p><button class="outline" type="submit">SAVE PASSWORD ↗</button></form>` : ""}<div class="rule"><b>01</b><div><strong>Your events</strong>${
     db.events
       .filter((v) =>
         (db.registrations || []).some(
@@ -1316,6 +1329,15 @@ document.addEventListener("click", async (ev) => {
   if (a === "proof") {
     const l = db.laps.find((x) => x.id === id);
     if (!l) return;
+    if (!canAdmin() && l.driver !== backend.identity.user?.id)
+      return toast("Lap proof is private.");
+    if (!demo) {
+      try {
+        Object.assign(l, await backend.readLapProof(l.id));
+      } catch (err) {
+        return toast(err.message || "Unable to open private proof.");
+      }
+    }
     let uploadedURL = "";
     if (l.storagePath) {
       try {
@@ -1428,6 +1450,7 @@ document.addEventListener("submit", (ev) => {
     fd = new FormData(f),
     v = Object.fromEntries(fd.entries()),
     errorSelector = {
+      "delete-driver-form": "#delete-driver-error",
       "lap-form": "#lap-error",
       "profile-form": "#profile-error",
       "email-auth-form": "#account-error",
@@ -1442,6 +1465,32 @@ document.addEventListener("submit", (ev) => {
   writeAction(
     f.querySelector('[type="submit"]'),
     async () => {
+      if (f.id === "delete-driver-form") {
+        requireAdmin();
+        const d = driver(f.dataset.id);
+        if (!d || v.confirmation.trim() !== d.name)
+          throw Error("Type the driver’s username exactly.");
+        if (demo) {
+          db.drivers = db.drivers.filter((x) => x.id !== d.id);
+          db.laps = db.laps.filter((x) => x.driver !== d.id);
+          db.events.forEach((event) => {
+            event.results = event.results?.filter((r) => r.driver !== d.id);
+            event.sessions?.forEach((session) => {
+              session.results = session.results.filter(
+                (r) => r.driver !== d.id,
+              );
+            });
+          });
+          commit();
+        } else {
+          await backend.deleteDriver(d.id, v.confirmation.trim());
+          await refresh();
+        }
+        closeModal();
+        render();
+        toast("Driver account and racing data permanently deleted.");
+        return;
+      }
       if (f.id === "badge-form") {
         requireAdmin();
         const assigned = fd.getAll("badges");
@@ -1490,8 +1539,22 @@ document.addEventListener("submit", (ev) => {
         authEmail = v.email.trim();
         authNotice = "";
         const registering = f.dataset.mode === "register";
+        const country = registering ? findCountry(v.country) : null;
+        if (registering && !country)
+          throw Error("Choose a country from the list.");
+        if (
+          registering &&
+          db.drivers.some(
+            (d) =>
+              d.name.toLowerCase() === (v.username || "").trim().toLowerCase(),
+          )
+        )
+          throw Error("That username is already taken.");
         const result = registering
-          ? await backend.registerWithEmail(authEmail, v.password)
+          ? await backend.registerWithEmail(authEmail, v.password, {
+              name: v.username,
+              countryCode: country.code,
+            })
           : await backend.signInWithEmail(authEmail, v.password);
         f.reset();
         if (registering && !result.session) {
@@ -1504,7 +1567,7 @@ document.addEventListener("submit", (ev) => {
         await refresh();
         toast(
           registering
-            ? "Account created. Complete your driver profile."
+            ? "Account created. Welcome to the FRA grid."
             : "Welcome back.",
         );
         return;
@@ -1710,6 +1773,11 @@ document.addEventListener("submit", (ev) => {
 window.addEventListener("hashchange", () => {
   closeModal();
   render(true);
+  if (live && location.hash === "#drivers") refresh();
+});
+window.addEventListener("focus", () => {
+  if (live && location.hash === "#drivers" && !modal.open && !writeBusy)
+    refresh();
 });
 render();
 if (live) {

@@ -3180,3 +3180,21 @@ body.booting {
 .hero-title {
   user-select: none;
 }
+
+/* Two-line racing headline retains its spark layer and room for the car. */
+.hero h1.racing-title {
+  font-size: clamp(48px, 7.2vw, 104px);
+  line-height: 1.05;
+  margin-top: 56px;
+}
+.hero h1.racing-title .accent,
+.hero h1.racing-title .ink-layer > span:last-child {
+  font-size: 1em;
+  letter-spacing: -0.065em;
+}
+@media (max-width: 700px) {
+  .hero h1.racing-title {
+    font-size: clamp(28px, 10.2vw, 48px);
+    margin-top: 52px;
+  }
+}

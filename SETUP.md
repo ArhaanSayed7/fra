@@ -18,7 +18,7 @@ In the new FRA project, open **SQL Editor** → **New query**. Copy the complete
 
 `supabase/migrations/202610120001_fra.sql`
 
-Run it once. Then run `supabase/migrations/202610120002_access_indexes.sql` in a second query, followed by `supabase/migrations/20261012224350_fra_email_registration.sql` in a third query. Then run `supabase/migrations/20261013013150_fra_developer_roles.sql` in a fourth query. Finally run `supabase/migrations/20261013024405_fra_racing_management.sql` in a fifth query. Together they create drivers for Discord and email accounts, creators, tracks, events, event entries/results, lap submissions, country choices, computed statistics/history, admin permission checks and the driver-media, creator-media and private lap-clips storage buckets. They also support ordered creator avatars, manual display badges and named qualifying/race result sessions. They do not add sample drivers or events. Use a fresh FRA project; do not run them against another application's existing database. All five have already been applied to the owner's FRA project; do not rerun them there.
+Run it once. Then run `supabase/migrations/202610120002_access_indexes.sql` in a second query, followed by `supabase/migrations/20261012224350_fra_email_registration.sql` in a third query. Then run `supabase/migrations/20261013013150_fra_developer_roles.sql` in a fourth query. Then run `supabase/migrations/20261013024405_fra_racing_management.sql` in a fifth query, followed by `supabase/migrations/20261013141855_fra_accounts_and_private_proof.sql` in a sixth query. Together they create drivers for Discord and email accounts, creators, tracks, events, event entries/results, lap submissions, country choices, computed statistics/history, admin permission checks and the driver-media, creator-media and private lap-clips storage buckets. They also support ordered creator avatars, manual display badges and named qualifying/race result sessions. They do not add sample drivers or events. Use a fresh FRA project; do not run them against another application's existing database. All six have already been applied to the owner's FRA project; do not rerun them there.
 
 If the query fails, the transaction rolls back. Fix the reported issue before rerunning. After a successful run, do not rerun the same migration: it is a one-time schema setup, not an update script.
 
@@ -77,7 +77,7 @@ In Supabase, open **Authentication → URL Configuration**:
 
 No `#account` hash is needed in these settings. The website handles the callback at its root and then opens the appropriate page. Avoid allowing arbitrary preview domains to redirect to your production database.
 
-In Supabase **Authentication → Sign In / Providers**, leave new-user signups enabled, enable **Email** and keep **Discord** enabled. Turn **Confirm email** off and save. Drivers can then enter an email and a password of at least eight characters, sign in immediately, and complete their driver profile. This flow needs no SMTP service. The website also provides email/password login. No password-reset email flow is included.
+In Supabase **Authentication → Sign In / Providers**, leave new-user signups enabled, enable **Email** and keep **Discord** enabled. Turn **Confirm email** off and save. Drivers choose a username and country, enter an email and a password of at least eight characters, and sign in immediately with their completed driver profile. This flow needs no SMTP service. The website also provides email/password login. No password-reset email flow is included.
 
 ## 7. Register yourself and enable developer ownership
 
@@ -116,7 +116,7 @@ The role takes effect at the database immediately; reload the website to update 
 5. After a race, use Events → Results to enter named qualifying lobbies and race sessions in the tables, then mark the event completed. Qualifying lobbies sort by lap time; race rows are finishing order. Their stats/history and earned Event Winner/Event Pole badges update automatically. Current approved overall track record holders receive the Lap Record badge.
 6. Review video clips under **Submissions** before approving or rejecting laps. A rejection requires a note.
 
-Drivers register themselves using email/password or Discord. In the Admin Panel you can edit their profile information and set them inactive. Inactive drivers retain past results but cannot enter events or submit laps. Authentication accounts are managed separately in Supabase; the website intentionally does not delete accounts/history. Creator order/avatars are managed under Creators; manual display badges under Drivers → Badges. See RACING-UPDATE.md for the full workflow.
+Drivers register themselves using email/password or Discord. In the Admin Panel you can edit their profile information and set them inactive. Inactive drivers retain past results but cannot enter events or submit laps. Admins can permanently delete eligible accounts and all their racing data through the included authenticated Supabase Edge Function; typed confirmation is required. Deploy the function as described in ACCOUNT-UPDATE.md. Creator order/avatars are managed under Creators; manual display badges under Drivers → Badges. See RACING-UPDATE.md for the full workflow.
 
 ## 9. Verify before opening registration to everyone
 

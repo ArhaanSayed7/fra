@@ -29,7 +29,7 @@ test("FRA migration and database access rules", async (t) => {
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema public,auth,storage to anon,authenticated;grant execute on function auth.uid() to anon,authenticated;
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
- create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text);
+ create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text,owner_id text);
  create function storage.foldername(text) returns text[] language sql immutable as $$select (string_to_array($1,'/'))[1:array_length(string_to_array($1,'/'),1)-1]$$;
  alter table storage.objects enable row level security;grant select,insert,delete on storage.objects to anon,authenticated;`);
   for (const file of [
@@ -74,6 +74,46 @@ test("FRA migration and database access rules", async (t) => {
       "utf8",
     ),
   );
+  await pg.exec(`insert into auth.users(id,raw_app_meta_data,raw_user_meta_data) values('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','{"provider":"email"}','{}');
+  update public.drivers set username='Migration Racer',country_code='CA' where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  insert into public.creators(id,name) values('dddddddd-dddd-4ddd-8ddd-dddddddddddd','Migration Creator');
+  insert into public.tracks(id,creator_id,name,map_code,released_on,weather,car_classes) values('ffffffff-ffff-4fff-8fff-ffffffffffff','dddddddd-dddd-4ddd-8ddd-dddddddddddd','Migration Track','1111-1111-1111','2026-10-13',array['Dry'],array['Prevalents']);
+  insert into public.laps(id,driver_id,track_id,weather,car_class,lap_ms,proof_url,status) values('99999999-9999-4999-8999-999999999999','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','ffffffff-ffff-4fff-8fff-ffffffffffff','Dry','Prevalents',90000,'https://example.com/old-proof','approved');`);
+  await pg.exec(
+    await readFile(
+      new URL(
+        "../supabase/migrations/20261013141855_fra_accounts_and_private_proof.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  assert.equal(
+    (
+      await root(
+        "select proof_url from private.lap_proofs where lap_id='99999999-9999-4999-8999-999999999999'",
+      )
+    ).rows[0].proof_url,
+    "https://example.com/old-proof",
+  );
+  assert.equal(
+    (
+      await root(
+        "select proof_url from public.laps where id='99999999-9999-4999-8999-999999999999'",
+      )
+    ).rows[0].proof_url,
+    "",
+  );
+  await root(
+    "delete from auth.users where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'",
+  );
+  await root(
+    "delete from public.tracks where id='ffffffff-ffff-4fff-8fff-ffffffffffff'",
+  );
+  await root(
+    "delete from public.creators where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd'",
+  );
+
   for (const id of [owner, other, incomplete, admin])
     await root(
       `insert into auth.users(id,raw_app_meta_data,raw_user_meta_data) values($1,'{"provider":"discord"}','{"avatar_url":"https://cdn.discordapp.com/avatar.png"}')`,
@@ -894,7 +934,7 @@ test("FRA migration and database access rules", async (t) => {
     },
   );
   await t.test(
-    "uploaded proof is owned, private while pending and readable only after approval",
+    "uploaded proof is private to owner/admin even after approval",
     async () => {
       const path = owner + "/99999999-9999-4999-8999-999999999999.mp4";
       await root("update public.drivers set is_active=true where id=$1", [
@@ -980,7 +1020,7 @@ test("FRA migration and database access rules", async (t) => {
             [path],
           )
         ).rows.length,
-        1,
+        0,
       );
       await assert.rejects(
         as(
@@ -989,7 +1029,7 @@ test("FRA migration and database access rules", async (t) => {
           `insert into public.laps(driver_id,track_id,weather,car_class,custom_car,tire_compound,lap_ms,proof_url) values($1,$2,'Dry','Prevalents','','Soft',100002,'')`,
           [owner, tid],
         ),
-        /check constraint/,
+        /valid video link|check constraint/,
       );
       await assert.rejects(
         as(
@@ -1014,6 +1054,246 @@ test("FRA migration and database access rules", async (t) => {
         admin,
         "insert into storage.objects(bucket_id,name) values('creator-media',$1)",
         [admin + "/avatar.png"],
+      );
+    },
+  );
+
+  await t.test(
+    "private proof links never appear in public lap rows and checked RPC denies other drivers",
+    async () => {
+      const lap = (
+        await root(
+          "select id,driver_id from public.laps where status='approved' limit 1",
+        )
+      ).rows[0];
+      const row = (
+        await as(
+          "anon",
+          null,
+          "select proof_url,proof_storage_path from public.laps where id=$1",
+          [lap.id],
+        )
+      ).rows[0];
+      assert.deepEqual(row, { proof_url: "", proof_storage_path: null });
+      await assert.rejects(
+        as("anon", null, "select public.read_lap_proof($1)", [lap.id]),
+        /permission denied/,
+      );
+      const stranger = incomplete;
+      await assert.rejects(
+        as("authenticated", stranger, "select public.read_lap_proof($1)", [
+          lap.id,
+        ]),
+        /private/,
+      );
+      assert.ok(
+        (
+          await as(
+            "authenticated",
+            admin,
+            "select public.read_lap_proof($1) as proof",
+            [lap.id],
+          )
+        ).rows[0].proof,
+      );
+      await assert.rejects(
+        as("authenticated", stranger, "select * from private.lap_proofs"),
+        /permission denied/,
+      );
+    },
+  );
+  await t.test(
+    "registration metadata creates complete drivers and display names follow profile edits",
+    async () => {
+      const id = "77777777-7777-4777-8777-777777777777";
+      await root(
+        'insert into auth.users(id,raw_app_meta_data,raw_user_meta_data) values($1,\'{"provider":"email"}\',\'{"username":"New Racer","country_code":"CA"}\')',
+        [id],
+      );
+      assert.equal(
+        (
+          await root("select is_registered from public.drivers where id=$1", [
+            id,
+          ])
+        ).rows[0].is_registered,
+        true,
+      );
+      assert.equal(
+        (
+          await root(
+            "select raw_user_meta_data->>'full_name' as name from auth.users where id=$1",
+            [id],
+          )
+        ).rows[0].name,
+        "New Racer",
+      );
+      await as(
+        "authenticated",
+        id,
+        "update public.drivers set username='Renamed Racer' where id=$1",
+        [id],
+      );
+      assert.equal(
+        (
+          await root(
+            "select raw_user_meta_data->>'display_name' as name from auth.users where id=$1",
+            [id],
+          )
+        ).rows[0].name,
+        "Renamed Racer",
+      );
+      await assert.rejects(
+        root(
+          'insert into auth.users(id,raw_app_meta_data,raw_user_meta_data) values(gen_random_uuid(),\'{"provider":"email"}\',\'{"username":"Bad Racer","country_code":"XX"}\')',
+        ),
+        /username and country/,
+      );
+    },
+  );
+  await t.test(
+    "deletion protects roles, locks writes immediately and cascades only the chosen racing account",
+    async () => {
+      const id = "77777777-7777-4777-8777-777777777777";
+      await assert.rejects(
+        as(
+          "authenticated",
+          incomplete,
+          "select public.prepare_driver_deletion($1,'Renamed Racer')",
+          [id],
+        ),
+        /Admin access/,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          admin,
+          "select public.prepare_driver_deletion($1,'Admin')",
+          [admin],
+        ),
+        /protected/,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          admin,
+          "select public.prepare_driver_deletion($1,'Developer')",
+          [owner],
+        ),
+        /protected/,
+      );
+      await root(
+        "insert into private.admin_users(user_id) values($1) on conflict do nothing",
+        [other],
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          admin,
+          "select public.prepare_driver_deletion($1,'Admin')",
+          [other],
+        ),
+        /Developer/,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          admin,
+          "select public.prepare_driver_deletion($1,'Wrong name')",
+          [id],
+        ),
+        /username exactly/,
+      );
+      await root(
+        "insert into public.event_registrations(event_id,driver_id) values($1,$2)",
+        [eid, id],
+      );
+      const lap = (await as("authenticated", id, lapSQL, [id, tid, "Soft"]))
+        .rows[0].id;
+      const session = (
+        await root(
+          "insert into public.event_sessions(event_id,kind,name,sort_order) values($1,'race','Deletion Test',20) returning id",
+          [eid],
+        )
+      ).rows[0].id;
+      await root(
+        "insert into public.event_session_results(session_id,driver_id,position,race_time) values($1,$2,9,'DNF')",
+        [session, id],
+      );
+      await as(
+        "authenticated",
+        admin,
+        "select public.prepare_driver_deletion($1,'Renamed Racer')",
+        [id],
+      );
+      assert.equal(
+        (
+          await as(
+            "authenticated",
+            id,
+            "update public.drivers set username='Escape' where id=$1 returning id",
+            [id],
+          )
+        ).rows.length,
+        0,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          id,
+          "insert into storage.objects(bucket_id,name) values('driver-media',$1)",
+          [id + "/new.png"],
+        ),
+        /row-level security/,
+      );
+      await root("delete from auth.users where id=$1", [id]);
+      assert.equal(
+        (await root("select id from public.drivers where id=$1", [id])).rows
+          .length,
+        0,
+      );
+      assert.equal(
+        (await root("select id from public.laps where id=$1", [lap])).rows
+          .length,
+        0,
+      );
+      assert.equal(
+        (
+          await root("select lap_id from private.lap_proofs where lap_id=$1", [
+            lap,
+          ])
+        ).rows.length,
+        0,
+      );
+      assert.equal(
+        (
+          await root(
+            "select driver_id from public.event_registrations where driver_id=$1",
+            [id],
+          )
+        ).rows.length,
+        0,
+      );
+      assert.equal(
+        (
+          await root(
+            "select driver_id from public.event_session_results where driver_id=$1",
+            [id],
+          )
+        ).rows.length,
+        0,
+      );
+      assert.ok(
+        (await root("select id from public.drivers where id=$1", [owner])).rows
+          .length,
+      );
+      await assert.rejects(
+        as(
+          "authenticated",
+          id,
+          "insert into storage.objects(bucket_id,name) values('driver-media',$1)",
+          [id + "/stale-token.png"],
+        ),
+        /row-level security/,
       );
     },
   );

@@ -101,11 +101,28 @@ test("email signup immediately signs in, password login restores the same profil
   const result = await backend.registerWithEmail(
     "  fixture@example.test  ",
     "fixture password",
+    { name: "Fixture Racer", countryCode: "CA" },
   );
   assert.equal(result.session.user.id, user.id);
   assert.equal(receivedSignup.email, "fixture@example.test");
   assert.equal(receivedSignup.password, "fixture password");
-  assert.deepEqual(receivedSignup.data, {});
+  assert.deepEqual(receivedSignup.data, {
+    username: "Fixture Racer",
+    full_name: "Fixture Racer",
+    display_name: "Fixture Racer",
+    country_code: "CA",
+  });
+  await assert.rejects(
+    backend.registerWithEmail("fixture@example.test", "fixture password"),
+    /username/,
+  );
+  await assert.rejects(
+    backend.registerWithEmail("fixture@example.test", "fixture password", {
+      name: "Fixture Racer",
+      countryCode: "XX",
+    }),
+    /country/,
+  );
   await backend.initialize();
   assert.equal(backend.identity.user.id, user.id);
   assert.equal(backend.identity.admin, false);
@@ -133,6 +150,7 @@ test("email signup immediately signs in, password login restores the same profil
   const awaiting = await backend.registerWithEmail(
     "fixture@example.test",
     "fixture password",
+    { name: "Fixture Racer", countryCode: "CA" },
   );
   assert.equal(awaiting.session, null);
   assert.equal(backend.identity.user, null);

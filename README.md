@@ -13,7 +13,7 @@ Modern black-and-yellow FRA racing hub, ready for GitHub and Cloudflare Pages, w
 - Time-trial leaderboard with track-specific filter choices. Unsupported tires and fixed single-choice weather/car filters are hidden; incompatible selections reset when switching tracks. Mandatory video proof using an HTTPS link or a private MP4/WebM/MOV device upload up to 50 MB.
 - Email/password or Discord registration and login, editable driver profiles, avatar and optional banner uploads, searchable country selector. Email signup signs in immediately when Supabase's Confirm email setting is off.
 - Compact driver list rows and profile popups with shorter landscape banners, events entered/won/podiums, lap records and scrollable event history. Developer/Admin role badges and earned Event Winner, Event Pole and Lap Record badges. Admins can award Map Developer and additional display badges.
-- Admin Panel with database-controlled access, driver editing/deactivation, creator/track/event management, results and lap moderation. Only the protected Developer can grant/revoke other registered drivers’ admin access from its Access tab.
+- Admin Panel with database-controlled access, driver editing/deactivation, creator/track/event management, results and lap moderation. Admins can permanently delete eligible accounts with typed confirmation. Only the protected Developer can grant/revoke other registered drivers’ admin access from its Access tab.
 
 ## Local development
 
@@ -35,6 +35,8 @@ For an isolated design preview, leave the Supabase variables blank and set `PUBL
 
 - `src/app.js`: pages, forms and interactions.
 - `src/backend.js`: Supabase authentication and database adapter.
+- `src/lap-input.js`: number-only lap input with fixed separators.
+- `supabase/functions/admin-delete-driver/`: authenticated account/media deletion.
 - `src/ui.js`: accessible dropdowns, searchable suggestions and headline interaction.
 - `src/leaderboard-filters.js`: catalogue-scoped filter choices and selection normalization.
 - `src/driver-badges.js`: role lookup and result-based achievement rules.
@@ -50,7 +52,7 @@ For an isolated design preview, leave the Supabase variables blank and set `PUBL
 
 ## Database behavior
 
-An email signup or first Discord sign-in creates an incomplete driver automatically. Choosing a valid country and a driver name finishes registration. Incomplete profiles cannot enter events or submit laps. Driver names are unique without regard to case. Inactive drivers retain public history but cannot enter or submit.
+Email signup requires a username and country and creates a complete driver profile. First Discord sign-in creates an incomplete driver; choosing a valid country and username finishes mandatory onboarding. Incomplete profiles cannot enter events or submit laps. Driver names are unique without regard to case. Inactive drivers retain public history but cannot enter or submit.
 
 For immediate email signup, enable Email and disable Confirm email in Supabase Authentication → Sign In / Providers. No SMTP setup is needed for this flow. Passwords are handled by Supabase Auth; they are never stored in driver records. Signed-in drivers with an email can set or update their password under My profile → Email sign-in. Existing Discord drivers can use this option to add email login to their current profile. This version does not include a password-reset email flow.
 
@@ -60,7 +62,7 @@ A lap record is the fastest approved lap on a track across all setups. Equal tim
 
 Events entered counts current event registrations, including historical result entries. Wins and podiums count only events marked completed. Event Winner badges require a completed race win; Event Pole badges require the fastest valid qualifying time in each lobby of a completed event, with a stable driver-ID tie break. Lap Record badges require a current approved overall track record. Losing a record removes that badge unless the driver still holds another record. Event details and result sessions are saved separately. Every result-session save is atomic, including the compatible per-event summary; invalid results roll back the entire save. Each qualifying lobby has its own pole, and race sessions preserve entered finishing order. Historical results automatically create matching event entries. Cancelling an upcoming entry removes it from the driver's entered count and history.
 
-Video proof accepts external HTTPS links or device uploads to the private lap-clips bucket (50 MB maximum). Owners/admins can view pending proof, and approved proof can be opened publicly through signed URLs. Creator avatars use a separate public image bucket with admin-only uploads. Custom car names are free-text suggestions collected from existing laps until an official list is supplied. Event sessions use America/Toronto. The site loads shared data on page load and after writes; reload to see changes made by another user.
+Video proof accepts external HTTPS links or device uploads to the private lap-clips bucket (50 MB maximum). Proof URLs and object paths are stored privately and are available only to the submitting driver and admins, including after approval. Public leaderboards do not expose proof links. Creator avatars use a separate public image bucket with admin-only uploads. Custom car names are free-text suggestions collected from existing laps until an official list is supplied. Event sessions use America/Toronto. The site loads shared data on page load and after writes; the driver directory also refreshes on navigation and window focus.
 
 ## Checks and deployment limits
 
@@ -69,9 +71,9 @@ npm test
 npm run build
 ```
 
-Database tests exercise all five migrations, email profile creation/backfill, profile permissions, catalogue permissions, lap ownership/setup validation/moderation, event entries, transactional results/statistics and media ownership, protected developer/admin management, and earned badge rules. Auth tests use the installed Supabase SDK with simulated responses to check immediate signup, password login, errors, password updates and the confirmation-enabled fallback. These tests do not create production accounts. The included build is connected to the owner’s FRA project using its public publishable key. Set the documented Cloudflare environment variables when rebuilding.
+Database tests exercise all six migrations, email profile creation/backfill, profile permissions, catalogue permissions, lap ownership/setup validation/moderation, event entries, transactional results/statistics and media ownership, protected developer/admin management, and earned badge rules. Auth tests use the installed Supabase SDK with simulated responses to check immediate signup, password login, errors, password updates and the confirmation-enabled fallback. These tests do not create production accounts. The included build is connected to the owner’s FRA project using its public publishable key. Set the documented Cloudflare environment variables when rebuilding.
 
-The site is a static Cloudflare Pages deployment. Supabase handles identity, database access and uploads directly; no Cloudflare functions or private API key are required. Configure database backups and usage limits for your own project as it grows.
+The site is a static Cloudflare Pages deployment. Supabase handles identity, database access and uploads directly. Its admin-delete-driver Edge Function handles permanent account/media deletion using built-in server credentials; no private API key belongs in the frontend or Cloudflare Pages. Configure database backups and usage limits for your own project as it grows.
 
 ## Assets
 

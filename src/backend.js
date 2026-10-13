@@ -109,11 +109,29 @@ export async function signInWithEmail(email, password) {
     await client.auth.signInWithPassword({ email: email.trim(), password }),
   );
 }
-export async function registerWithEmail(email, password) {
+export async function registerWithEmail(email, password, profile = {}) {
   if (!client) throw Error("Account registration is unavailable right now.");
   if (password.length < 8)
     throw Error("Choose a password with at least 8 characters.");
-  return check(await client.auth.signUp({ email: email.trim(), password }));
+  const name = (profile.name || "").trim();
+  if (name.length < 3 || name.length > 32)
+    throw Error("Choose a username between 3 and 32 characters.");
+  if (!countries.some((c) => c.code === profile.countryCode))
+    throw Error("Choose a country from the list.");
+  return check(
+    await client.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: {
+          username: name,
+          full_name: name,
+          display_name: name,
+          country_code: profile.countryCode,
+        },
+      },
+    }),
+  );
 }
 export async function setPassword(password) {
   if (!client || !identity.user) throw Error("Sign in first.");
@@ -477,4 +495,26 @@ export async function clipURL(path) {
   return check(
     await client.storage.from("lap-clips").createSignedUrl(path, 3600),
   ).signedUrl;
+}
+
+export async function readLapProof(id) {
+  const proof = check(await client.rpc("read_lap_proof", { p_lap_id: id }));
+  return {
+    proof: proof.proof_url || "",
+    storagePath: proof.proof_storage_path || "",
+  };
+}
+export async function deleteDriver(id, confirmation) {
+  const { data, error } = await client.functions.invoke("admin-delete-driver", {
+    body: { driverId: id, confirmation },
+  });
+  if (error) {
+    let message = error.message;
+    try {
+      message = (await error.context.json()).error || message;
+    } catch {}
+    throw Error(message);
+  }
+  if (!data?.deleted)
+    throw Error(data?.error || "Unable to delete this driver.");
 }
